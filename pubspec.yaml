@@ -1,0 +1,47 @@
+name: nobolso
+description: "NoBolso - finanças pessoais 100% offline (Projeto Integrador 6)"
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.13.5
+
+# Nenhum pacote abaixo desenha gráficos nem usa rede (plano, seção 8).
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+
+  sqflite: ^2.4.4+1
+  # Usado só no Windows/desktop (desenvolvimento) e nos testes.
+  sqflite_common_ffi: ^2.4.3
+  path: ^1.9.1
+  intl: ^0.20.3
+  flutter_local_notifications: ^22.3.1
+  pdf: ^3.12.0
+  excel: ^4.0.6
+  path_provider: ^2.1.6
+  share_plus: ^13.3.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/
+    # Roboto embutida no PDF (acentos e qualquer caractere Unicode).
+    - assets/fonts/Roboto-Regular.ttf
+    - assets/fonts/Roboto-Bold.ttf
+
+  # Mesma fonte em Android e iOS, inclusive nos textos desenhados no Canvas.
+  fonts:
+    - family: Roboto
+      fonts:
+        - asset: assets/fonts/Roboto-Regular.ttf
+        - asset: assets/fonts/Roboto-Bold.ttf
+          weight: 700
