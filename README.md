@@ -7,6 +7,8 @@ Equipe: Erick, Grazieli e Gustavo.
 
 ## Como rodar
 
+**Passo a passo completo (inclusive para configurar um PC do zero): [COMO_RODAR.md](COMO_RODAR.md).**
+
 Pré-requisitos: Flutter SDK (em `C:\src\flutter`), Android Studio com Android SDK e um emulador.
 
 ```bash
