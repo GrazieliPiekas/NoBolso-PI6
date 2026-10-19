@@ -1,154 +1,98 @@
-import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:share_plus/share_plus.dart';
 
-import '../database/categoria_dao.dart';
-import '../database/lancamento_dao.dart';
 import '../models/categoria.dart';
 import '../models/tipo.dart';
-import '../services/filtro_relatorio.dart';
 import '../services/recomendacao_service.dart';
-import '../services/relatorio_pdf_service.dart';
 import '../services/relatorio_planilha_service.dart';
 import '../theme/app_theme.dart';
-import '../utils/eventos.dart';
 import '../utils/formatadores.dart';
+import '../viewmodels/relatorios_view_model.dart';
 import '../widgets/componentes.dart';
 
 /// Relatórios: filtros De/Até, categoria e tipo; resumo; exportar PDF / XLSX / CSV;
 /// recomendações automáticas.
-class RelatoriosScreen extends StatefulWidget {
-  const RelatoriosScreen({super.key});
+class RelatoriosView extends StatefulWidget {
+  const RelatoriosView({super.key});
   @override
-  State<RelatoriosScreen> createState() => _RelatoriosScreenState();
+  State<RelatoriosView> createState() => _RelatoriosViewState();
 }
 
-class _RelatoriosScreenState extends State<RelatoriosScreen> {
-  final _dao = LancamentoDao();
-  Periodo _periodo = Periodo.mes(DateTime.now());
-  Tipo? _tipo;
-  Categoria? _categoria;
-  List<Categoria> _categorias = [];
-  Totais? _totais;
-  List<Recomendacao>? _recomendacoes;
-  bool _exportando = false;
-
-  FiltroRelatorio get _filtro => FiltroRelatorio(
-    periodo: _periodo,
-    tipo: _tipo,
-    categoriaId: _categoria?.id,
-    categoriaNome: _categoria?.nome,
-  );
-
-  @override
-  void initState() {
-    super.initState();
-    Eventos.dadosAlterados.addListener(_carregar);
-    _carregar();
-  }
+class _RelatoriosViewState extends State<RelatoriosView> {
+  // ViewModel da tela (MVVM): guarda os dados e faz as ações.
+  // A tela só desenha, e o ListenableBuilder redesenha quando ele avisa.
+  final _viewModel = RelatoriosViewModel();
 
   @override
   void dispose() {
-    Eventos.dadosAlterados.removeListener(_carregar);
+    _viewModel.dispose();
     super.dispose();
   }
 
-  Future<void> _carregar() async {
-    final cats = await CategoriaDao().listar();
-    final t = await _dao.totais(
-      periodo: _periodo,
-      tipo: _tipo,
-      categoriaId: _categoria?.id,
-    );
-    final rec = await RecomendacaoService().gerar(_periodo);
-    if (!mounted) return;
-    setState(() {
-      _categorias = cats;
-      // A categoria pode ter sido excluída/alterada em outra tela.
-      if (_categoria != null && !cats.any((c) => c.id == _categoria!.id)) {
-        _categoria = null;
-      }
-      _totais = t;
-      _recomendacoes = rec;
-    });
-  }
-
   Future<void> _escolherData({required bool inicio}) async {
-    final d = await showDatePicker(
+    final dataEscolhida = await showDatePicker(
       context: context,
-      initialDate: inicio ? _periodo.de : _periodo.ate,
+      initialDate: inicio ? _viewModel.periodo.de : _viewModel.periodo.ate,
       firstDate: DateTime(2000),
       lastDate: DateTime(2100),
     );
-    if (d == null) return;
-    setState(() {
-      if (inicio) {
-        _periodo = Periodo(d, d.isAfter(_periodo.ate) ? d : _periodo.ate);
-      } else {
-        _periodo = Periodo(d.isBefore(_periodo.de) ? d : _periodo.de, d);
-      }
-    });
-    _carregar();
+    if (dataEscolhida == null) return;
+    inicio
+        ? _viewModel.definirInicio(dataEscolhida)
+        : _viewModel.definirFim(dataEscolhida);
   }
 
-  Future<void> _exportar(Future<File> Function() gerar, String nome) async {
-    setState(() => _exportando = true);
+  Future<void> _exportar(Future<void> Function() exportar, String nome) async {
     try {
-      final arquivo = await gerar();
-      if (!mounted) return;
-      await SharePlus.instance.share(
-        ShareParams(
-          files: [XFile(arquivo.path)],
-          subject: 'Relatório NoBolso',
-        ),
-      );
-    } catch (e) {
+      await exportar();
+    } catch (erro) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Não foi possível exportar o $nome: $e')),
+          SnackBar(content: Text('Não foi possível exportar o $nome: $erro')),
         );
       }
-    } finally {
-      if (mounted) setState(() => _exportando = false);
     }
   }
 
-  void _exportarPdf() =>
-      _exportar(() => RelatorioPdfService().gerar(_filtro), 'PDF');
+  void _exportarPdf() => _exportar(_viewModel.exportarPdf, 'PDF');
 
   Future<void> _exportarPlanilha() async {
     final formato = await showModalBottomSheet<FormatoPlanilha>(
       context: context,
-      builder: (c) => SafeArea(
+      builder: (contextoDialogo) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
               leading: const Icon(Icons.grid_on, color: Cores.verde),
               title: const Text('Excel (.xlsx)'),
-              onTap: () => Navigator.pop(c, FormatoPlanilha.xlsx),
+              onTap: () => Navigator.pop(contextoDialogo, FormatoPlanilha.xlsx),
             ),
             ListTile(
-              leading: const Icon(Icons.text_snippet_outlined, color: Cores.verde),
+              leading: const Icon(
+                Icons.text_snippet_outlined,
+                color: Cores.verde,
+              ),
               title: const Text('CSV (.csv)'),
               subtitle: const Text('Separado por ponto e vírgula'),
-              onTap: () => Navigator.pop(c, FormatoPlanilha.csv),
+              onTap: () => Navigator.pop(contextoDialogo, FormatoPlanilha.csv),
             ),
           ],
         ),
       ),
     );
     if (formato == null) return;
-    _exportar(
-      () => RelatorioPlanilhaService().gerar(_filtro, formato),
-      'arquivo',
-    );
+    _exportar(() => _viewModel.exportarPlanilha(formato), 'arquivo');
   }
 
   @override
-  Widget build(BuildContext context) => Stack(
+  Widget build(BuildContext context) => ListenableBuilder(
+    listenable: _viewModel,
+    builder: (context, _) => _corpo(),
+  );
+
+  Widget _corpo() => Stack(
     children: [
       ListView(
         padding: EdgeInsets.zero,
@@ -165,7 +109,7 @@ class _RelatoriosScreenState extends State<RelatoriosScreen> {
           const SizedBox(height: 12),
         ],
       ),
-      if (_exportando)
+      if (_viewModel.exportando)
         const ColoredBox(
           color: Color(0x55000000),
           child: Center(child: CircularProgressIndicator(color: Colors.white)),
@@ -179,9 +123,17 @@ class _RelatoriosScreenState extends State<RelatoriosScreen> {
       children: [
         Row(
           children: [
-            _caixaData('De', _periodo.de, () => _escolherData(inicio: true)),
+            _caixaData(
+              'De',
+              _viewModel.periodo.de,
+              () => _escolherData(inicio: true),
+            ),
             const SizedBox(width: 10),
-            _caixaData('Até', _periodo.ate, () => _escolherData(inicio: false)),
+            _caixaData(
+              'Até',
+              _viewModel.periodo.ate,
+              () => _escolherData(inicio: false),
+            ),
           ],
         ),
         const SizedBox(height: 10),
@@ -189,51 +141,38 @@ class _RelatoriosScreenState extends State<RelatoriosScreen> {
           children: [
             Expanded(
               child: PopupMenuButton<Categoria?>(
-                onSelected: (c) {
-                  setState(() => _categoria = c);
-                  _carregar();
-                },
+                onSelected: _viewModel.mudarCategoria,
                 itemBuilder: (_) => [
                   const PopupMenuItem(
                     value: null,
                     child: Text('Todas as categorias'),
                   ),
-                  for (final c in _categorias.where(
-                    (c) => _tipo == null || c.tipo == _tipo,
-                  ))
+                  for (final categoria in _viewModel.categoriasDoTipo)
                     PopupMenuItem(
-                      value: c,
+                      value: categoria,
                       child: Text(
-                        _tipo == null
-                            ? '${c.nome} (${c.tipo.rotulo.toLowerCase()})'
-                            : c.nome,
+                        _viewModel.tipo == null
+                            ? '${categoria.nome} (${categoria.tipo.rotulo.toLowerCase()})'
+                            : categoria.nome,
                       ),
                     ),
                 ],
-                child: _pilulaFiltro(_filtro.descricaoCategoria),
+                child: _pilulaFiltro(_viewModel.filtro.descricaoCategoria),
               ),
             ),
             const SizedBox(width: 10),
             Expanded(
               child: PopupMenuButton<Tipo?>(
-                onSelected: (t) {
-                  setState(() {
-                    _tipo = t;
-                    if (_categoria != null && t != null && _categoria!.tipo != t) {
-                      _categoria = null;
-                    }
-                  });
-                  _carregar();
-                },
+                onSelected: _viewModel.mudarTipo,
                 itemBuilder: (_) => [
                   const PopupMenuItem(
                     value: null,
                     child: Text('Receitas e despesas'),
                   ),
-                  for (final t in Tipo.values)
-                    PopupMenuItem(value: t, child: Text(t.rotuloPlural)),
+                  for (final tipo in Tipo.values)
+                    PopupMenuItem(value: tipo, child: Text(tipo.rotuloPlural)),
                 ],
-                child: _pilulaFiltro(_filtro.descricaoTipo),
+                child: _pilulaFiltro(_viewModel.filtro.descricaoTipo),
               ),
             ),
           ],
@@ -300,9 +239,9 @@ class _RelatoriosScreenState extends State<RelatoriosScreen> {
   );
 
   Widget _cartaoResumo() {
-    final t = _totais;
-    if (t == null) return const CartaoSecao(child: Carregando());
-    final maior = math.max(1, math.max(t.receitas, t.despesas));
+    final totais = _viewModel.totais;
+    if (totais == null) return const CartaoSecao(child: Carregando());
+    final maior = math.max(1, math.max(totais.receitas, totais.despesas));
     Widget linha(String rotulo, int valor, Color cor) => Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Column(
@@ -329,68 +268,76 @@ class _RelatoriosScreenState extends State<RelatoriosScreen> {
     return CartaoSecao(
       titulo: 'Resumo do período',
       acao: RotuloSuave(
-        '${t.quantidade} lançamento${t.quantidade == 1 ? '' : 's'}',
+        '${totais.quantidade} lançamento${totais.quantidade == 1 ? '' : 's'}',
       ),
       child: Column(
         children: [
-          linha('Receitas', t.receitas, Cores.verde),
-          linha('Despesas', t.despesas, Cores.despesa),
-          linha('Saldo', t.saldo, t.saldo >= 0 ? Cores.verde : Cores.despesa),
+          linha('Receitas', totais.receitas, Cores.verde),
+          linha('Despesas', totais.despesas, Cores.despesa),
+          linha(
+            'Saldo',
+            totais.saldo,
+            totais.saldo >= 0 ? Cores.verde : Cores.despesa,
+          ),
         ],
       ),
     );
   }
 
   Widget _botoesExportar() {
-    final semDados = (_totais?.quantidade ?? 0) == 0;
-    Widget botao(String sigla, String rotulo, Color cor, Color fundo, VoidCallback f) =>
-        Expanded(
-          child: Material(
-            color: Cores.cartao,
-            borderRadius: BorderRadius.circular(22),
-            child: InkWell(
-              borderRadius: BorderRadius.circular(22),
-              onTap: semDados || _exportando
-                  ? () => ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Não há lançamentos com esses filtros para exportar.'),
-                      ),
-                    )
-                  : f,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 20),
-                child: Column(
-                  children: [
-                    Container(
-                      width: 52,
-                      height: 60,
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        color: fundo,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Text(
-                        sigla,
-                        style: TextStyle(
-                          color: cor,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
+    final semDados = _viewModel.semDados;
+    Widget botao(
+      String sigla,
+      String rotulo,
+      Color cor,
+      Color fundo,
+      VoidCallback aoTocar,
+    ) => Expanded(
+      child: Material(
+        color: Cores.cartao,
+        borderRadius: BorderRadius.circular(22),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(22),
+          onTap: semDados || _viewModel.exportando
+              ? () => ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                      'Não há lançamentos com esses filtros para exportar.',
                     ),
-                    const SizedBox(height: 10),
-                    Text(
-                      rotulo,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 15,
-                      ),
-                    ),
-                  ],
+                  ),
+                )
+              : aoTocar,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 20),
+            child: Column(
+              children: [
+                Container(
+                  width: 52,
+                  height: 60,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: fundo,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    sigla,
+                    style: TextStyle(color: cor, fontWeight: FontWeight.w800),
+                  ),
                 ),
-              ),
+                const SizedBox(height: 10),
+                Text(
+                  rotulo,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 15,
+                  ),
+                ),
+              ],
             ),
           ),
-        );
+        ),
+      ),
+    );
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
       child: Row(
@@ -416,27 +363,37 @@ class _RelatoriosScreenState extends State<RelatoriosScreen> {
   }
 
   Widget _cartaoRecomendacoes() {
-    final r = _recomendacoes;
+    final recomendacoes = _viewModel.recomendacoes;
     return CartaoSecao(
       titulo: 'Recomendações',
       acao: const RotuloSuave('Automáticas'),
-      child: r == null
+      child: recomendacoes == null
           ? const Carregando()
-          : Column(children: [for (final x in r) _ItemRecomendacao(x)]),
+          : Column(
+              children: [
+                for (final item in recomendacoes) _ItemRecomendacao(item),
+              ],
+            ),
     );
   }
 }
 
 class _ItemRecomendacao extends StatelessWidget {
-  final Recomendacao r;
-  const _ItemRecomendacao(this.r);
+  final Recomendacao recomendacao;
+  const _ItemRecomendacao(this.recomendacao);
 
   @override
   Widget build(BuildContext context) {
-    final (fundo, cor) = switch (r.tipo) {
+    final (fundo, cor) = switch (recomendacao.tipo) {
       TipoRecomendacao.alerta => (const Color(0xFFF5EADC), Cores.alerta),
-      TipoRecomendacao.dica => (const Color(0xFFEDEAE0), const Color(0xFF5A7A8A)),
-      TipoRecomendacao.info => (const Color(0xFFECEAE3), const Color(0xFF8A7088)),
+      TipoRecomendacao.dica => (
+        const Color(0xFFEDEAE0),
+        const Color(0xFF5A7A8A),
+      ),
+      TipoRecomendacao.info => (
+        const Color(0xFFECEAE3),
+        const Color(0xFF8A7088),
+      ),
       TipoRecomendacao.positivo => (const Color(0xFFE8EBE0), Cores.verde),
     };
     return Container(
@@ -459,13 +416,16 @@ class _ItemRecomendacao extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  r.titulo,
+                  recomendacao.titulo,
                   style: const TextStyle(fontWeight: FontWeight.w700),
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  r.descricao,
-                  style: const TextStyle(color: Cores.textoSuave, fontSize: 12.5),
+                  recomendacao.descricao,
+                  style: const TextStyle(
+                    color: Cores.textoSuave,
+                    fontSize: 12.5,
+                  ),
                 ),
               ],
             ),

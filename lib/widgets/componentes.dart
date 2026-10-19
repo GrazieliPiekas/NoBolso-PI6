@@ -78,13 +78,14 @@ class CabecalhoTela extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     color: Cores.cabecalho,
     padding: EdgeInsets.fromLTRB(
-      24,
+      12,
       MediaQuery.paddingOf(context).top + 18,
       12,
       18,
     ),
     child: Row(
       children: [
+        const BotaoMenu(),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -200,10 +201,7 @@ class Aviso extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(
                   mensagem!,
-                  style: const TextStyle(
-                    color: Cores.textoSuave,
-                    fontSize: 13,
-                  ),
+                  style: const TextStyle(color: Cores.textoSuave, fontSize: 13),
                 ),
               ],
             ],
@@ -246,8 +244,8 @@ class BarraProgresso extends StatelessWidget {
       tween: Tween(begin: 0, end: fracao.clamp(0.0, 1.0)),
       duration: const Duration(milliseconds: 700),
       curve: Curves.easeOutCubic,
-      builder: (_, v, _) => LinearProgressIndicator(
-        value: v,
+      builder: (_, valor, _) => LinearProgressIndicator(
+        value: valor,
         minHeight: altura,
         color: cor,
         backgroundColor: Cores.trilho,
@@ -264,4 +262,21 @@ class Carregando extends StatelessWidget {
     padding: EdgeInsets.all(32),
     child: Center(child: CircularProgressIndicator(color: Cores.verde)),
   );
+}
+
+/// Abre o menu lateral (Drawer) da navegação principal. Some se a tela não tiver Drawer.
+class BotaoMenu extends StatelessWidget {
+  final Color cor;
+  const BotaoMenu({super.key, this.cor = Cores.texto});
+
+  @override
+  Widget build(BuildContext context) {
+    final scaffold = Scaffold.maybeOf(context);
+    if (scaffold == null || !scaffold.hasDrawer) return const SizedBox.shrink();
+    return IconButton(
+      tooltip: 'Menu',
+      onPressed: scaffold.openDrawer,
+      icon: Icon(Icons.menu, color: cor),
+    );
+  }
 }

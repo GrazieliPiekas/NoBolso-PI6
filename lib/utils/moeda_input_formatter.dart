@@ -9,6 +9,7 @@ class MoedaInputFormatter extends TextInputFormatter {
     decimalDigits: 2,
   );
 
+  /// Formata centavos para o campo de valor: 18640 vira "186,40".
   static String formatar(int centavos) => _fmt.format(centavos / 100);
 
   @override

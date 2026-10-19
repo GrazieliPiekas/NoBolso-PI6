@@ -2,7 +2,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter/services.dart' show rootBundle;
-import 'package:path/path.dart' as p;
+import 'package:path/path.dart' as caminho;
 import 'package:path_provider/path_provider.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -23,30 +23,33 @@ class RelatorioPdfService {
   static const _cinza = PdfColor.fromInt(0xFF8A8778);
   static const _bege = PdfColor.fromInt(0xFFEFE5DA);
 
-  Future<File> gerar(FiltroRelatorio f) async {
+  /// Busca os lançamentos do filtro, monta o PDF e salva numa pasta temporária.
+  Future<File> gerar(FiltroRelatorio filtro) async {
     final itens = await _dao.listar(
-      periodo: f.periodo,
-      tipo: f.tipo,
-      categoriaId: f.categoriaId,
+      periodo: filtro.periodo,
+      tipo: filtro.tipo,
+      categoriaId: filtro.categoriaId,
     );
     final totais = await _dao.totais(
-      periodo: f.periodo,
-      tipo: f.tipo,
-      categoriaId: f.categoriaId,
+      periodo: filtro.periodo,
+      tipo: filtro.tipo,
+      categoriaId: filtro.categoriaId,
     );
     final tema = pw.ThemeData.withFont(
-      base: pw.Font.ttf(await rootBundle.load('assets/fonts/Roboto-Regular.ttf')),
+      base: pw.Font.ttf(
+        await rootBundle.load('assets/fonts/Roboto-Regular.ttf'),
+      ),
       bold: pw.Font.ttf(await rootBundle.load('assets/fonts/Roboto-Bold.ttf')),
     );
-    final bytes = await montar(f, itens, totais, tema: tema);
+    final bytes = await montar(filtro, itens, totais, tema: tema);
     final dir = await getTemporaryDirectory();
-    final arquivo = File(p.join(dir.path, '${f.nomeArquivo}.pdf'));
+    final arquivo = File(caminho.join(dir.path, '${filtro.nomeArquivo}.pdf'));
     return arquivo.writeAsBytes(bytes, flush: true);
   }
 
   /// Separado de [gerar] para poder ser testado sem sistema de arquivos.
   static Future<Uint8List> montar(
-    FiltroRelatorio f,
+    FiltroRelatorio filtro,
     List<Lancamento> itens,
     Totais totais, {
     DateTime? geradoEm,
@@ -66,7 +69,7 @@ class RelatorioPdfService {
         header: (ctx) => ctx.pageNumber == 1
             ? pw.SizedBox()
             : pw.Text(
-                'NoBolso · ${f.descricaoPeriodo}',
+                'NoBolso · ${filtro.descricaoPeriodo}',
                 style: const pw.TextStyle(color: _cinza, fontSize: 9),
               ),
         footer: (ctx) => pw.Row(
@@ -92,9 +95,9 @@ class RelatorioPdfService {
             ),
           ),
           pw.SizedBox(height: 6),
-          pw.Text('Período: ${f.descricaoPeriodo}'),
-          pw.Text('Categoria: ${f.descricaoCategoria}'),
-          pw.Text('Tipo: ${f.descricaoTipo}'),
+          pw.Text('Período: ${filtro.descricaoPeriodo}'),
+          pw.Text('Categoria: ${filtro.descricaoCategoria}'),
+          pw.Text('Tipo: ${filtro.descricaoTipo}'),
           pw.SizedBox(height: 16),
           pw.Container(
             padding: const pw.EdgeInsets.all(12),
@@ -126,15 +129,15 @@ class RelatorioPdfService {
             pw.TableHelper.fromTextArray(
               headers: ['Data', 'Descrição', 'Categoria', 'Tipo', 'Valor'],
               data: [
-                for (final l in itens)
+                for (final lancamento in itens)
                   [
-                    Formatadores.dataCurta(l.data),
-                    l.descricao,
-                    l.categoriaNome ?? '',
-                    l.tipo.rotulo,
+                    Formatadores.dataCurta(lancamento.data),
+                    lancamento.descricao,
+                    lancamento.categoriaNome ?? '',
+                    lancamento.tipo.rotulo,
                     Formatadores.moedaComSinal(
-                      l.valorCentavos,
-                      positivo: l.tipo == Tipo.receita,
+                      lancamento.valorCentavos,
+                      positivo: lancamento.tipo == Tipo.receita,
                     ),
                   ],
               ],

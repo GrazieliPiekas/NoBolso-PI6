@@ -1,4 +1,4 @@
-﻿import 'dart:math' as math;
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart' hide Viewport;
 
@@ -7,6 +7,7 @@ import '../theme/app_theme.dart';
 import '../utils/formatadores.dart';
 import 'texto.dart';
 
+/// Uma barra do gráfico: rótulo embaixo, valor e cor.
 class ItemBarra {
   final String rotulo;
   final double valor;
@@ -25,13 +26,15 @@ class BarrasPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     if (itens.isEmpty) return;
-    final maximo = Viewport.maximoAgradavel(itens.map((e) => e.valor).reduce(math.max));
+    final maximo = Viewport.maximoAgradavel(
+      itens.map((item) => item.valor).reduce(math.max),
+    );
 
     // Decide se os rótulos cabem deitados; se não, gira e reserva mais base.
     final estiloRotulo = const TextStyle(color: Cores.textoSuave, fontSize: 11);
     final larguraFaixaEstimada = size.width * 0.84 / itens.length;
     final maiorRotulo = itens
-        .map((e) => medirTexto(e.rotulo, estiloRotulo).width)
+        .map((item) => medirTexto(item.rotulo, estiloRotulo).width)
         .reduce(math.max);
     final girar = maiorRotulo > larguraFaixaEstimada - 4;
 
@@ -46,7 +49,7 @@ class BarrasPainter extends CustomPainter {
         ? primeiro * seno45 - larguraFaixaEstimada / 2 + 4
         : 0.0;
 
-    final vp = Viewport.comMargens(
+    final viewport = Viewport.comMargens(
       size,
       xMin: 0,
       xMax: itens.length.toDouble(),
@@ -63,25 +66,30 @@ class BarrasPainter extends CustomPainter {
       ..color = Cores.trilho
       ..strokeWidth = 1;
     for (var i = 0; i <= 4; i++) {
-      final v = maximo * i / 4;
-      final y = vp.yTela(v);
-      canvas.drawLine(Offset(vp.area.left, y), Offset(vp.area.right, y), grade);
+      final valorGrade = maximo * i / 4;
+      final y = viewport.yTela(valorGrade);
+      canvas.drawLine(
+        Offset(viewport.area.left, y),
+        Offset(viewport.area.right, y),
+        grade,
+      );
       desenharTexto(
         canvas,
-        Formatadores.moedaCurta((v * 100).round()).replaceFirst(r'R$ ', ''),
-        Offset(vp.area.left - 6, y),
+        Formatadores.moedaCurta((valorGrade * 100).round())
+            .replaceFirst(r'R$ ', ''),
+        Offset(viewport.area.left - 6, y),
         ancora: Ancora.direita,
         estilo: const TextStyle(color: Cores.textoSuave, fontSize: 10),
       );
     }
 
-    final larguraFaixa = vp.escalaX; // 1 unidade do mundo = 1 faixa
+    final larguraFaixa = viewport.escalaX; // 1 unidade do mundo = 1 faixa
     final larguraBarra = larguraFaixa * 0.6;
     for (var i = 0; i < itens.length; i++) {
       final item = itens[i];
-      final centroX = vp.xTela(i + 0.5);
-      final topo = vp.yTela(item.valor * progresso);
-      final base = vp.yTela(0);
+      final centroX = viewport.xTela(i + 0.5);
+      final topo = viewport.yTela(item.valor * progresso);
+      final base = viewport.yTela(0);
       final rect = Rect.fromLTRB(
         centroX - larguraBarra / 2,
         topo,
@@ -115,6 +123,6 @@ class BarrasPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(BarrasPainter old) =>
-      old.progresso != progresso || old.itens != itens;
+  bool shouldRepaint(BarrasPainter anterior) =>
+      anterior.progresso != progresso || anterior.itens != itens;
 }

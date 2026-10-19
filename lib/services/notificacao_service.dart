@@ -22,6 +22,7 @@ class NotificacaoService {
 
   bool get _suportado => !kIsWeb && (Platform.isAndroid || Platform.isIOS);
 
+  /// Configura o plugin de notificação. Chamado uma vez no main().
   Future<void> inicializar() async {
     if (!_suportado) return;
     try {

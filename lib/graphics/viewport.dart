@@ -44,7 +44,10 @@ class Viewport {
   double get escalaX => area.width / (xMax - xMin);
   double get escalaY => area.height / (yMax - yMin);
 
+  /// Converte um x "do mundo" (índice, valor) para o pixel na tela.
   double xTela(double x) => area.left + (x - xMin) * escalaX;
+
+  /// Mesma ideia do xTela, mas o Y é invertido: no Canvas o 0 fica em cima.
   double yTela(double y) => area.top + area.height - (y - yMin) * escalaY;
 
   Offset paraTela(double x, double y) => Offset(xTela(x), yTela(y));
@@ -54,14 +57,14 @@ class Viewport {
   static double maximoAgradavel(double valor) {
     if (valor <= 0) return 1;
     final expoente = math.pow(10, (math.log(valor) / math.ln10).floor());
-    final f = valor / expoente;
-    final passo = f <= 1
+    final fracao = valor / expoente;
+    final passo = fracao <= 1
         ? 1
-        : f <= 2
+        : fracao <= 2
         ? 2
-        : f <= 2.5
+        : fracao <= 2.5
         ? 2.5
-        : f <= 5
+        : fracao <= 5
         ? 5
         : 10;
     return passo * expoente.toDouble();
@@ -74,14 +77,18 @@ class Viewport {
     double maior, {
     int divisoes = 4,
   }) {
-    final lo = math.min(0.0, menor);
-    final hi = math.max(0.0, maior);
-    if (hi == lo) return (0, 1, 0.25);
-    var passo = maximoAgradavel((hi - lo) / divisoes);
+    final minimo = math.min(0.0, menor);
+    final maximo = math.max(0.0, maior);
+    if (maximo == minimo) return (0, 1, 0.25);
+    var passo = maximoAgradavel((maximo - minimo) / divisoes);
     // Garante que o arredondamento para múltiplos do passo não exceda as divisões.
-    while (((hi / passo).ceil() - (lo / passo).floor()) > divisoes) {
+    while (((maximo / passo).ceil() - (minimo / passo).floor()) > divisoes) {
       passo = maximoAgradavel(passo * 1.01);
     }
-    return ((lo / passo).floor() * passo, (hi / passo).ceil() * passo, passo);
+    return (
+      (minimo / passo).floor() * passo,
+      (maximo / passo).ceil() * passo,
+      passo,
+    );
   }
 }

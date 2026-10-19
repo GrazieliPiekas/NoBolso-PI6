@@ -30,11 +30,11 @@ class Orcamento {
     'limite_centavos': limiteCentavos,
   };
 
-  factory Orcamento.fromMap(Map<String, Object?> m) => Orcamento(
-    id: m['id'] as int,
-    categoriaId: m['categoria_id'] as int?,
-    limiteCentavos: m['limite_centavos'] as int,
-    categoriaNome: m['categoria_nome'] as String?,
-    categoriaCor: m['categoria_cor'] as int?,
+  factory Orcamento.fromMap(Map<String, Object?> mapa) => Orcamento(
+    id: mapa['id'] as int,
+    categoriaId: mapa['categoria_id'] as int?,
+    limiteCentavos: mapa['limite_centavos'] as int,
+    categoriaNome: mapa['categoria_nome'] as String?,
+    categoriaCor: mapa['categoria_cor'] as int?,
   );
 }

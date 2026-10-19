@@ -18,8 +18,11 @@ import 'package:nobolso/database/database_helper.dart';
 import 'package:nobolso/database/orcamento_dao.dart';
 import 'package:nobolso/models/orcamento.dart';
 import 'package:nobolso/models/tipo.dart';
-import 'package:nobolso/screens/boas_vindas_screen.dart';
-import 'package:nobolso/screens/lancamento_form_screen.dart';
+import 'package:nobolso/views/boas_vindas_view.dart';
+import 'package:nobolso/views/categorias_view.dart';
+import 'package:nobolso/views/lancamento_form_view.dart';
+import 'package:nobolso/views/lancamentos_view.dart';
+import 'package:nobolso/views/sobre_view.dart';
 import 'package:nobolso/services/gerador_dados_service.dart';
 import 'package:nobolso/theme/app_theme.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
@@ -80,6 +83,8 @@ void main() {
 
   Future<void> capturar(WidgetTester t, String nome) async {
     await t.pump(const Duration(seconds: 2));
+    // Segundo quadro: animações iniciadas no quadro anterior terminam.
+    await t.pump(const Duration(seconds: 1));
     await t.runAsync(() async {
       final boundary =
           chave.currentContext!.findRenderObject()! as RenderRepaintBoundary;
@@ -112,11 +117,13 @@ void main() {
 
     await semear();
 
-    await t.pumpWidget(envolver(BoasVindasScreen(onConcluir: () {})));
-    await t.runAsync(() => precacheImage(
-      const AssetImage('assets/images/icone_nobolso.png'),
-      t.element(find.byType(BoasVindasScreen)),
-    ));
+    await t.pumpWidget(envolver(BoasVindasView(onConcluir: () {})));
+    await t.runAsync(
+      () => precacheImage(
+        const AssetImage('assets/images/icone_nobolso.png'),
+        t.element(find.byType(BoasVindasView)),
+      ),
+    );
     await capturar(t, '0_boas_vindas');
 
     await t.pumpWidget(envolver(const NavegacaoPrincipal()));
@@ -133,11 +140,55 @@ void main() {
       await capturar(t, nome);
     }
 
-    await t.pumpWidget(envolver(const LancamentoFormScreen()));
+    // Menu lateral (Drawer), aberto pela aba Relatórios.
+    await t.tap(find.byTooltip('Menu').hitTestable());
+    await t.pump(const Duration(milliseconds: 400));
+    await t.runAsync(
+      () => precacheImage(
+        const AssetImage('assets/images/icone_nobolso.png'),
+        t.element(find.byType(Drawer)),
+      ),
+    );
+    await capturar(t, '6_menu_lateral');
+
+    // Formulário de orçamento (RadioButtons), pela aba Orçamento.
+    await t.pumpWidget(const SizedBox());
+    await t.pumpWidget(envolver(const NavegacaoPrincipal()));
+    await t.pump(const Duration(milliseconds: 300));
+    await t.tap(find.text('Orçamento'));
+    await t.pump(const Duration(milliseconds: 300));
+    await t.tap(find.byTooltip('Novo orçamento'));
+    await t.pump(const Duration(milliseconds: 400));
+    // Os dados chegam do banco num quadro; as cores animam no seguinte.
+    await t.pump(const Duration(seconds: 1));
+    await capturar(t, '10_orcamento_form');
+    await t.pumpWidget(const SizedBox());
+
+    await t.pumpWidget(envolver(const LancamentoFormView()));
     await t.pump(const Duration(milliseconds: 300));
     await t.enterText(find.byType(TextField).first, '18640');
     await t.tap(find.text('Alimentação'));
+    await t.tap(find.text('Despesa fixa'));
     await capturar(t, '4_novo_lancamento');
+
+    await t.pumpWidget(envolver(const LancamentosView()));
+    await t.pump(const Duration(milliseconds: 300));
+    await capturar(t, '7_lancamentos');
+    await t.enterText(find.byType(TextField).first, 'pada');
+    await capturar(t, '8_lancamentos_busca');
+
+    await t.pumpWidget(envolver(const CategoriasView()));
+    await t.pump(const Duration(milliseconds: 300));
+    await capturar(t, '9_categorias');
+
+    await t.pumpWidget(envolver(const SobreView()));
+    await t.runAsync(
+      () => precacheImage(
+        const AssetImage('assets/images/logo_nobolso_escuro.png'),
+        t.element(find.byType(SobreView)),
+      ),
+    );
+    await capturar(t, '11_sobre');
 
     await t.pumpWidget(const SizedBox());
     await DatabaseHelper.instance.fechar();

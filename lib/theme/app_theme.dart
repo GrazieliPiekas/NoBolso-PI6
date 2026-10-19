@@ -39,6 +39,7 @@ class Cores {
   ];
 }
 
+/// Tema do app (cores, fontes e estilo dos campos), usado no MaterialApp.
 class AppTheme {
   AppTheme._();
 

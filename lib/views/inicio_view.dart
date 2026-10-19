@@ -1,83 +1,62 @@
 import 'package:flutter/material.dart';
 
-import '../database/configuracao_dao.dart';
 import '../painters/barras_painter.dart';
 import '../painters/rosca_painter.dart';
 import '../services/dados_graficos_service.dart';
 import '../theme/app_theme.dart';
-import '../utils/eventos.dart';
 import '../utils/formatadores.dart';
+import '../viewmodels/inicio_view_model.dart';
 import '../widgets/componentes.dart';
 import '../widgets/grafico_animado.dart';
 import '../widgets/item_lancamento.dart';
 import '../widgets/perfil_dialog.dart';
-import 'categorias_screen.dart';
-import 'lancamento_form_screen.dart';
-import 'lancamentos_screen.dart';
+import 'categorias_view.dart';
+import 'lancamento_form_view.dart';
+import 'lancamentos_view.dart';
 
 /// Painel: saldo do mês, rosca (receitas × despesas), barras (gastos por categoria)
 /// e últimos lançamentos.
-class InicioScreen extends StatefulWidget {
-  const InicioScreen({super.key});
+class InicioView extends StatefulWidget {
+  const InicioView({super.key});
   @override
-  State<InicioScreen> createState() => _InicioScreenState();
+  State<InicioView> createState() => _InicioViewState();
 }
 
-class _InicioScreenState extends State<InicioScreen> {
-  final _servico = DadosGraficosService();
-  final _config = ConfiguracaoDao();
-  DadosInicio? _dados;
-  String? _nome;
-  int _versao = 0;
-
-  @override
-  void initState() {
-    super.initState();
-    Eventos.dadosAlterados.addListener(_carregar);
-    Eventos.perfilAlterado.addListener(_carregarNome);
-    _carregar();
-    _carregarNome();
-  }
+class _InicioViewState extends State<InicioView> {
+  // ViewModel da tela (MVVM): guarda os dados e faz as ações.
+  // A tela só desenha, e o ListenableBuilder redesenha quando ele avisa.
+  final _viewModel = InicioViewModel();
 
   @override
   void dispose() {
-    Eventos.dadosAlterados.removeListener(_carregar);
-    Eventos.perfilAlterado.removeListener(_carregarNome);
+    _viewModel.dispose();
     super.dispose();
   }
 
-  Future<void> _carregar() async {
-    final d = await _servico.inicio(DateTime.now());
-    if (mounted) {
-      setState(() {
-        _dados = d;
-        _versao++;
-      });
-    }
-  }
-
-  Future<void> _carregarNome() async {
-    final n = await _config.nomeUsuario();
-    if (mounted) setState(() => _nome = n);
-  }
+  int get _versao => _viewModel.versao;
 
   @override
-  Widget build(BuildContext context) {
-    final d = _dados;
+  Widget build(BuildContext context) => ListenableBuilder(
+    listenable: _viewModel,
+    builder: (context, _) => _corpo(),
+  );
+
+  Widget _corpo() {
+    final dados = _viewModel.dados;
     return RefreshIndicator(
       color: Cores.verde,
-      onRefresh: _carregar,
+      onRefresh: _viewModel.carregar,
       child: ListView(
         padding: EdgeInsets.zero,
         children: [
-          _Cabecalho(nome: _nome, dados: d),
+          _Cabecalho(nome: _viewModel.nome, dados: dados),
           const SizedBox(height: 18),
-          if (d == null)
+          if (dados == null)
             const Carregando()
           else ...[
-            _cartaoRosca(d),
-            _cartaoBarras(d),
-            _cartaoUltimos(d),
+            _cartaoRosca(dados),
+            _cartaoBarras(dados),
+            _cartaoUltimos(dados),
           ],
           const SizedBox(height: 12),
         ],
@@ -85,10 +64,11 @@ class _InicioScreenState extends State<InicioScreen> {
     );
   }
 
-  Widget _cartaoRosca(DadosInicio d) {
-    final t = d.totais;
-    final total = t.receitas + t.despesas;
-    String pct(int v) => total == 0 ? '0%' : '${(v * 100 / total).round()}%';
+  Widget _cartaoRosca(DadosInicio dados) {
+    final totais = dados.totais;
+    final total = totais.receitas + totais.despesas;
+    String porcentagem(int valor) =>
+        total == 0 ? '0%' : '${(valor * 100 / total).round()}%';
     return CartaoSecao(
       titulo: 'Receitas x Despesas',
       acao: RotuloSuave(Formatadores.mesAno(DateTime.now()).split(' ').first),
@@ -100,16 +80,16 @@ class _InicioScreenState extends State<InicioScreen> {
               chave: _versao,
               altura: 150,
               descricaoAcessivel:
-                  'Gráfico de rosca: receitas ${Formatadores.moeda(t.receitas)}, '
-                  'despesas ${Formatadores.moeda(t.despesas)}',
-              painter: (p) => RoscaPainter(
+                  'Gráfico de rosca: receitas ${Formatadores.moeda(totais.receitas)}, '
+                  'despesas ${Formatadores.moeda(totais.despesas)}',
+              painter: (progresso) => RoscaPainter(
                 [
-                  FatiaRosca(t.receitas.toDouble(), Cores.verde),
-                  FatiaRosca(t.despesas.toDouble(), Cores.despesaClara),
+                  FatiaRosca(totais.receitas.toDouble(), Cores.verde),
+                  FatiaRosca(totais.despesas.toDouble(), Cores.despesaClara),
                 ],
-                textoCentro: Formatadores.moedaCurta(t.saldo),
+                textoCentro: Formatadores.moedaCurta(totais.saldo),
                 subtextoCentro: 'saldo',
-                progresso: p,
+                progresso: progresso,
               ),
             ),
           ),
@@ -118,16 +98,20 @@ class _InicioScreenState extends State<InicioScreen> {
             flex: 6,
             child: Column(
               children: [
-                _legenda(Cores.verde, 'Receitas', pct(t.receitas)),
+                _legenda(Cores.verde, 'Receitas', porcentagem(totais.receitas)),
                 const SizedBox(height: 10),
-                _legenda(Cores.despesaClara, 'Despesas', pct(t.despesas)),
+                _legenda(
+                  Cores.despesaClara,
+                  'Despesas',
+                  porcentagem(totais.despesas),
+                ),
                 const SizedBox(height: 14),
                 Text(
                   total == 0
                       ? 'Nenhum lançamento neste mês ainda.'
-                      : t.receitas == 0
+                      : totais.receitas == 0
                       ? 'Sem receitas registradas no mês.'
-                      : 'Você gastou ${(t.despesas * 100 / t.receitas).round()}% do que recebeu.',
+                      : 'Você gastou ${(totais.despesas * 100 / totais.receitas).round()}% do que recebeu.',
                   style: const TextStyle(color: Cores.textoSuave, fontSize: 12),
                 ),
               ],
@@ -160,10 +144,10 @@ class _InicioScreenState extends State<InicioScreen> {
     ],
   );
 
-  Widget _cartaoBarras(DadosInicio d) => CartaoSecao(
+  Widget _cartaoBarras(DadosInicio dados) => CartaoSecao(
     titulo: 'Gastos por categoria',
     acao: const RotuloSuave('Este mês'),
-    child: d.porCategoria.isEmpty
+    child: dados.porCategoria.isEmpty
         ? const EstadoVazio(
             icone: Icons.bar_chart,
             titulo: 'Sem despesas este mês',
@@ -173,42 +157,45 @@ class _InicioScreenState extends State<InicioScreen> {
             chave: _versao,
             altura: 240,
             descricaoAcessivel:
-                'Gráfico de barras de gastos por categoria: ${d.porCategoria.map((c) => '${c.nome} ${Formatadores.moeda(c.totalCentavos)}').join(', ')}',
-            painter: (p) => BarrasPainter(
-              [
-                for (final c in d.porCategoria.take(7))
-                  ItemBarra(c.nome, c.totalCentavos / 100, Color(c.cor)),
-              ],
-              progresso: p,
-            ),
+                'Gráfico de barras de gastos por categoria: ${dados.porCategoria.map((categoria) => '${categoria.nome} ${Formatadores.moeda(categoria.totalCentavos)}').join(', ')}',
+            painter: (progresso) => BarrasPainter([
+              for (final categoria in dados.porCategoria.take(7))
+                ItemBarra(
+                  categoria.nome,
+                  categoria.totalCentavos / 100,
+                  Color(categoria.cor),
+                ),
+            ], progresso: progresso),
           ),
   );
 
-  Widget _cartaoUltimos(DadosInicio d) => CartaoSecao(
+  Widget _cartaoUltimos(DadosInicio dados) => CartaoSecao(
     titulo: 'Últimos lançamentos',
     acao: TextButton(
-      onPressed: () => Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => const LancamentosScreen()),
-      ),
+      onPressed: () =>
+          Navigator.of(context)
+              .push(MaterialPageRoute(builder: (_) => const LancamentosView())),
       child: const Text('Ver todos', style: TextStyle(color: Cores.textoSuave)),
     ),
-    child: d.ultimos.isEmpty
+    child: dados.ultimos.isEmpty
         ? EstadoVazio(
             icone: Icons.receipt_long_outlined,
             titulo: 'Nada por aqui ainda',
-            mensagem: 'Toque no + para registrar sua primeira receita ou despesa.',
+            mensagem:
+                'Toque no + para registrar sua primeira receita ou despesa.',
             acao: OutlinedButton.icon(
-              onPressed: () => LancamentoFormScreen.abrir(context),
+              onPressed: () => LancamentoFormView.abrir(context),
               icon: const Icon(Icons.add),
               label: const Text('Novo lançamento'),
             ),
           )
         : Column(
             children: [
-              for (final l in d.ultimos)
+              for (final lancamento in dados.ultimos)
                 ItemLancamento(
-                  l,
-                  onTap: () => LancamentoFormScreen.abrir(context, editar: l),
+                  lancamento,
+                  onTap: () =>
+                      LancamentoFormView.abrir(context, editar: lancamento),
                 ),
             ],
           ),
@@ -222,7 +209,7 @@ class _Cabecalho extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final t = dados?.totais;
+    final totais = dados?.totais;
     final topo = MediaQuery.paddingOf(context).top;
     return ClipPath(
       clipper: _CurvaBase(),
@@ -234,12 +221,13 @@ class _Cabecalho extends StatelessWidget {
             colors: [Color(0xFF3D6744), Color(0xFF28432F)],
           ),
         ),
-        padding: EdgeInsets.fromLTRB(22, topo + 18, 14, 40),
+        padding: EdgeInsets.fromLTRB(10, topo + 18, 14, 40),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
+                const BotaoMenu(cor: Colors.white),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -262,7 +250,7 @@ class _Cabecalho extends StatelessWidget {
                 IconButton(
                   tooltip: 'Categorias',
                   onPressed: () => Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const CategoriasScreen()),
+                    MaterialPageRoute(builder: (_) => const CategoriasView()),
                   ),
                   icon: const Icon(Icons.sell_outlined, color: Colors.white),
                 ),
@@ -277,7 +265,10 @@ class _Cabecalho extends StatelessWidget {
                       radius: 22,
                       backgroundColor: Colors.white.withValues(alpha: 0.15),
                       child: nome == null
-                          ? const Icon(Icons.person_outline, color: Colors.white)
+                          ? const Icon(
+                              Icons.person_outline,
+                              color: Colors.white,
+                            )
                           : Text(
                               nome!.characters.first.toUpperCase(),
                               style: const TextStyle(
@@ -291,38 +282,47 @@ class _Cabecalho extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 24),
-            const Text(
-              'Saldo do mês',
-              style: TextStyle(color: Color(0xFFC9D6C3), fontSize: 15),
-            ),
-            FittedBox(
-              fit: BoxFit.scaleDown,
-              child: Text(
-                t == null ? '...' : Formatadores.moeda(t.saldo),
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 40,
-                  fontWeight: FontWeight.w800,
-                ),
+            // Alinha o saldo com a saudação (à direita do botão de menu).
+            Padding(
+              padding: const EdgeInsets.only(left: 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 24),
+                  const Text(
+                    'Saldo do mês',
+                    style: TextStyle(color: Color(0xFFC9D6C3), fontSize: 15),
+                  ),
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      totais == null ? '...' : Formatadores.moeda(totais.saldo),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 40,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      _Pilula(
+                        cor: Cores.verdeClaro,
+                        rotulo: 'Receitas',
+                        valor: totais?.receitas,
+                      ),
+                      const SizedBox(width: 10),
+                      _Pilula(
+                        cor: Cores.despesaClara,
+                        rotulo: 'Despesas',
+                        valor: totais?.despesas,
+                      ),
+                      const SizedBox(width: 8),
+                    ],
+                  ),
+                ],
               ),
-            ),
-            const SizedBox(height: 14),
-            Row(
-              children: [
-                _Pilula(
-                  cor: Cores.verdeClaro,
-                  rotulo: 'Receitas',
-                  valor: t?.receitas,
-                ),
-                const SizedBox(width: 10),
-                _Pilula(
-                  cor: Cores.despesaClara,
-                  rotulo: 'Despesas',
-                  valor: t?.despesas,
-                ),
-                const SizedBox(width: 8),
-              ],
             ),
           ],
         ),
@@ -355,7 +355,10 @@ class _Pilula extends StatelessWidget {
               children: [
                 Text(
                   rotulo,
-                  style: const TextStyle(color: Color(0xFFC9D6C3), fontSize: 12),
+                  style: const TextStyle(
+                    color: Color(0xFFC9D6C3),
+                    fontSize: 12,
+                  ),
                 ),
                 FittedBox(
                   fit: BoxFit.scaleDown,
@@ -379,10 +382,15 @@ class _Pilula extends StatelessWidget {
 /// Borda inferior levemente curva do cabeçalho (Bézier quadrática).
 class _CurvaBase extends CustomClipper<Path> {
   @override
-  Path getClip(Size s) => Path()
-    ..lineTo(0, s.height - 26)
-    ..quadraticBezierTo(s.width / 2, s.height + 10, s.width, s.height - 26)
-    ..lineTo(s.width, 0)
+  Path getClip(Size tamanho) => Path()
+    ..lineTo(0, tamanho.height - 26)
+    ..quadraticBezierTo(
+      tamanho.width / 2,
+      tamanho.height + 10,
+      tamanho.width,
+      tamanho.height - 26,
+    )
+    ..lineTo(tamanho.width, 0)
     ..close();
 
   @override

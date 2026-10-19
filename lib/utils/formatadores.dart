@@ -1,5 +1,6 @@
 import 'package:intl/intl.dart';
 
+/// Funções para formatar dinheiro e datas do jeito brasileiro.
 class Formatadores {
   Formatadores._();
 
@@ -34,34 +35,44 @@ class Formatadores {
   /// 171965 → "1.719,65" (sem símbolo; usado no CSV).
   static String numero(int centavos) => _numero.format(centavos / 100);
 
-  static String dataParaDb(DateTime d) => _db.format(d);
-  static DateTime dataDoDb(String s) => DateTime.parse(s);
-  static String dataCurta(DateTime d) => _curta.format(d);
-  static String dataLonga(DateTime d) => _longa.format(d);
+  /// Data no formato do banco: "2026-10-19" (permite filtrar com BETWEEN).
+  static String dataParaDb(DateTime data) => _db.format(data);
+
+  /// Volta do texto do banco para DateTime.
+  static DateTime dataDoDb(String texto) => DateTime.parse(texto);
+
+  /// "19/10/2026"
+  static String dataCurta(DateTime data) => _curta.format(data);
+
+  /// "19 de outubro de 2026"
+  static String dataLonga(DateTime data) => _longa.format(data);
 
   /// "Setembro 2026".
-  static String mesAno(DateTime d) => capitalizar(_mes.format(d));
+  static String mesAno(DateTime data) => capitalizar(_mes.format(data));
 
   /// "Set".
-  static String mesAbreviado(DateTime d) =>
-      capitalizar(_mesAbrev.format(d).replaceAll('.', ''));
+  static String mesAbreviado(DateTime data) =>
+      capitalizar(_mesAbrev.format(data).replaceAll('.', ''));
 
   /// Referência do mês usada em alertas_enviados: "2026-09".
-  static String referenciaMes(DateTime d) =>
-      '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}';
+  static String referenciaMes(DateTime data) {
+    final ano = data.year.toString().padLeft(4, '0');
+    final mes = data.month.toString().padLeft(2, '0');
+    return '$ano-$mes';
+  }
 
-  static String capitalizar(String s) =>
-      s.isEmpty ? s : s[0].toUpperCase() + s.substring(1);
+  static String capitalizar(String texto) =>
+      texto.isEmpty ? texto : texto[0].toUpperCase() + texto.substring(1);
 
   /// Converte o texto digitado ("186,40", "1.234,5", "50") em centavos.
   /// Retorna null se não for um número válido.
   static int? centavosDeTexto(String texto) {
-    var t = texto.trim().replaceAll(RegExp(r'[R$\s]'), '');
-    if (t.isEmpty) return null;
-    t = t.replaceAll('.', '').replaceAll(',', '.');
-    final v = double.tryParse(t);
-    if (v == null || v.isNaN || v.isInfinite) return null;
-    return (v * 100).round();
+    var limpo = texto.trim().replaceAll(RegExp(r'[R$\s]'), '');
+    if (limpo.isEmpty) return null;
+    limpo = limpo.replaceAll('.', '').replaceAll(',', '.');
+    final valor = double.tryParse(limpo);
+    if (valor == null || valor.isNaN || valor.isInfinite) return null;
+    return (valor * 100).round();
   }
 
   static const diasSemanaCurtos = ['S', 'T', 'Q', 'Q', 'S', 'S', 'D'];
@@ -85,13 +96,15 @@ class Periodo {
     : de = DateTime(de.year, de.month, de.day),
       ate = DateTime(ate.year, ate.month, ate.day);
 
-  factory Periodo.mes(DateTime d) =>
-      Periodo(DateTime(d.year, d.month, 1), DateTime(d.year, d.month + 1, 0));
+  factory Periodo.mes(DateTime data) => Periodo(
+    DateTime(data.year, data.month, 1),
+    DateTime(data.year, data.month + 1, 0),
+  );
 
   /// Os últimos [n] meses terminando no mês de [d] (inclusive).
-  factory Periodo.ultimosMeses(DateTime d, int n) => Periodo(
-    DateTime(d.year, d.month - n + 1, 1),
-    DateTime(d.year, d.month + 1, 0),
+  factory Periodo.ultimosMeses(DateTime data, int quantidadeMeses) => Periodo(
+    DateTime(data.year, data.month - quantidadeMeses + 1, 1),
+    DateTime(data.year, data.month + 1, 0),
   );
 
   String get deDb => Formatadores.dataParaDb(de);

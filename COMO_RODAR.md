@@ -134,7 +134,7 @@ Combinem quem mexe em qual arquivo para evitar conflitos.
 
 | Comando | Para quê |
 |---------|----------|
-| `flutter test` | Roda os 38 testes automatizados |
+| `flutter test` | Roda os 41 testes automatizados |
 | `flutter test tool/capturar_telas_test.dart` | Gera imagens das telas em `build/telas/` |
 | `flutter test tool/medir_desempenho_test.dart` | Mede tempos com 100, 1.000 e 10.000 lançamentos |
 | `flutter analyze` | Procura erros no código |

@@ -11,16 +11,18 @@ class ConfiguracaoDao {
   static const chaveNome = 'nome_usuario';
   static const chaveBoasVindas = 'boas_vindas_vista';
 
+  /// Lê um valor da tabela chave/valor `configuracoes` (null se não existir).
   Future<String?> ler(String chave) async {
     final db = await _helper.database;
-    final r = await db.query(
+    final linhas = await db.query(
       'configuracoes',
       where: 'chave = ?',
       whereArgs: [chave],
     );
-    return r.isEmpty ? null : r.first['valor'] as String?;
+    return linhas.isEmpty ? null : linhas.first['valor'] as String?;
   }
 
+  /// Grava ou substitui o valor da chave (INSERT OR REPLACE).
   Future<void> gravar(String chave, String? valor) async {
     final db = await _helper.database;
     await db.insert('configuracoes', {
@@ -30,8 +32,8 @@ class ConfiguracaoDao {
   }
 
   Future<String?> nomeUsuario() async {
-    final n = (await ler(chaveNome))?.trim();
-    return (n == null || n.isEmpty) ? null : n;
+    final nome = (await ler(chaveNome))?.trim();
+    return (nome == null || nome.isEmpty) ? null : nome;
   }
 
   Future<void> salvarNome(String? nome) => gravar(chaveNome, nome?.trim());

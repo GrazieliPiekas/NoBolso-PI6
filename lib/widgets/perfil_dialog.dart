@@ -1,11 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
-import '../database/configuracao_dao.dart';
-import '../database/lancamento_dao.dart';
-import '../services/gerador_dados_service.dart';
 import '../theme/app_theme.dart';
-import '../utils/eventos.dart';
+import '../viewmodels/perfil_view_model.dart';
 
 /// Perfil local: só o nome, guardado no SQLite. Em modo debug mostra o gerador
 /// de lançamentos fictícios para testes de desempenho e com participantes.
@@ -20,60 +17,36 @@ class PerfilDialog extends StatefulWidget {
 }
 
 class _PerfilDialogState extends State<PerfilDialog> {
+  // ViewModel da tela (MVVM): guarda os dados e faz as ações.
+  // A tela só desenha, e o ListenableBuilder redesenha quando ele avisa.
+  final _viewModel = PerfilViewModel();
   final _nome = TextEditingController();
-  final _config = ConfiguracaoDao();
-  bool _ocupado = false;
-  String? _status;
 
   @override
   void initState() {
     super.initState();
-    _config.nomeUsuario().then((n) => _nome.text = n ?? '');
+    _viewModel.nomeAtual().then((nomeSalvo) => _nome.text = nomeSalvo ?? '');
   }
 
   @override
   void dispose() {
     _nome.dispose();
+    _viewModel.dispose();
     super.dispose();
   }
 
   Future<void> _salvar() async {
-    await _config.salvarNome(_nome.text);
-    Eventos.notificarPerfil();
+    await _viewModel.salvarNome(_nome.text);
     if (mounted) Navigator.pop(context);
   }
 
-  Future<void> _gerar(int qtd) async {
-    setState(() {
-      _ocupado = true;
-      _status = 'Gerando $qtd lançamentos...';
-    });
-    final tempo = await GeradorDadosService().gerar(qtd);
-    final total = await LancamentoDao().contar();
-    Eventos.notificarDados();
-    if (mounted) {
-      setState(() {
-        _ocupado = false;
-        _status =
-            '$qtd inseridos em ${tempo.inMilliseconds} ms. Total no banco: $total.';
-      });
-    }
-  }
-
-  Future<void> _apagarTudo() async {
-    setState(() => _ocupado = true);
-    await LancamentoDao().excluirTodos();
-    Eventos.notificarDados();
-    if (mounted) {
-      setState(() {
-        _ocupado = false;
-        _status = 'Todos os lançamentos foram apagados.';
-      });
-    }
-  }
-
   @override
-  Widget build(BuildContext context) => AlertDialog(
+  Widget build(BuildContext context) => ListenableBuilder(
+    listenable: _viewModel,
+    builder: (context, _) => _dialogo(),
+  );
+
+  Widget _dialogo() => AlertDialog(
     title: const Text('Seu perfil'),
     content: SingleChildScrollView(
       child: Column(
@@ -84,7 +57,9 @@ class _PerfilDialogState extends State<PerfilDialog> {
             controller: _nome,
             maxLength: 30,
             textCapitalization: TextCapitalization.words,
-            decoration: const InputDecoration(labelText: 'Como podemos te chamar?'),
+            decoration: const InputDecoration(
+              labelText: 'Como podemos te chamar?',
+            ),
           ),
           const Row(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -111,27 +86,29 @@ class _PerfilDialogState extends State<PerfilDialog> {
               spacing: 8,
               runSpacing: 8,
               children: [
-                for (final n in const [100, 1000, 10000])
+                for (final quantidade in const [100, 1000, 10000])
                   OutlinedButton(
-                    onPressed: _ocupado ? null : () => _gerar(n),
-                    child: Text('+$n'),
+                    onPressed: _viewModel.ocupado
+                        ? null
+                        : () => _viewModel.gerar(quantidade),
+                    child: Text('+$quantidade'),
                   ),
                 OutlinedButton(
                   style: OutlinedButton.styleFrom(
                     foregroundColor: Cores.despesa,
                   ),
-                  onPressed: _ocupado ? null : _apagarTudo,
+                  onPressed: _viewModel.ocupado ? null : _viewModel.apagarTudo,
                   child: const Text('Apagar lançamentos'),
                 ),
               ],
             ),
-            if (_ocupado) ...[
+            if (_viewModel.ocupado) ...[
               const SizedBox(height: 10),
               const LinearProgressIndicator(color: Cores.verde),
             ],
-            if (_status != null) ...[
+            if (_viewModel.status != null) ...[
               const SizedBox(height: 8),
-              Text(_status!, style: const TextStyle(fontSize: 12)),
+              Text(_viewModel.status!, style: const TextStyle(fontSize: 12)),
             ],
           ],
         ],

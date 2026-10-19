@@ -10,7 +10,9 @@ class DatabaseHelper {
   static final DatabaseHelper instance = DatabaseHelper._();
 
   static const _nomeArquivo = 'nobolso.db';
-  static const _versao = 1;
+
+  /// v2: coluna booleana `fixo` em lançamentos.
+  static const _versao = 2;
 
   /// Nos testes recebe `inMemoryDatabasePath`.
   String? caminhoPersonalizado;
@@ -27,17 +29,29 @@ class DatabaseHelper {
       version: _versao,
       onConfigure: (db) => db.execute('PRAGMA foreign_keys = ON'),
       onCreate: _criar,
+      onUpgrade: _atualizar,
     );
   }
 
+  /// Migração de quem já tinha o banco v1: nada é perdido.
+  static Future<void> _atualizar(Database db, int de, int para) async {
+    if (de < 2) {
+      await db.execute(
+        'ALTER TABLE lancamentos ADD COLUMN '
+        'fixo INTEGER NOT NULL DEFAULT 0 CHECK (fixo IN (0, 1))',
+      );
+    }
+  }
+
+  /// Fecha o banco. Usado nos testes para começar cada um com um banco limpo.
   Future<void> fechar() async {
     await _db?.close();
     _db = null;
   }
 
   static Future<void> _criar(Database db, int versao) async {
-    final b = db.batch();
-    b.execute('''
+    final lote = db.batch();
+    lote.execute('''
       CREATE TABLE categorias (
         id    INTEGER PRIMARY KEY AUTOINCREMENT,
         nome  TEXT NOT NULL,
@@ -45,31 +59,32 @@ class DatabaseHelper {
         cor   INTEGER NOT NULL,
         UNIQUE (nome, tipo)
       )''');
-    b.execute('''
+    lote.execute('''
       CREATE TABLE lancamentos (
         id              INTEGER PRIMARY KEY AUTOINCREMENT,
         descricao       TEXT NOT NULL,
         valor_centavos  INTEGER NOT NULL CHECK (valor_centavos > 0),
         tipo            TEXT NOT NULL CHECK (tipo IN ('receita','despesa')),
         categoria_id    INTEGER NOT NULL REFERENCES categorias(id) ON DELETE RESTRICT,
-        data            TEXT NOT NULL
+        data            TEXT NOT NULL,
+        fixo            INTEGER NOT NULL DEFAULT 0 CHECK (fixo IN (0, 1))
       )''');
-    b.execute('CREATE INDEX idx_lancamentos_data ON lancamentos(data)');
-    b.execute(
+    lote.execute('CREATE INDEX idx_lancamentos_data ON lancamentos(data)');
+    lote.execute(
       'CREATE INDEX idx_lancamentos_categoria ON lancamentos(categoria_id)',
     );
-    b.execute('''
+    lote.execute('''
       CREATE TABLE orcamentos (
         id               INTEGER PRIMARY KEY AUTOINCREMENT,
         categoria_id     INTEGER UNIQUE REFERENCES categorias(id) ON DELETE RESTRICT,
         limite_centavos  INTEGER NOT NULL CHECK (limite_centavos > 0)
       )''');
     // UNIQUE não impede vários NULL no SQLite: este índice garante um único orçamento geral.
-    b.execute(
+    lote.execute(
       'CREATE UNIQUE INDEX idx_orcamento_geral ON orcamentos((categoria_id IS NULL)) '
       'WHERE categoria_id IS NULL',
     );
-    b.execute('''
+    lote.execute('''
       CREATE TABLE alertas_enviados (
         id            INTEGER PRIMARY KEY AUTOINCREMENT,
         orcamento_id  INTEGER NOT NULL REFERENCES orcamentos(id) ON DELETE CASCADE,
@@ -77,20 +92,20 @@ class DatabaseHelper {
         nivel         INTEGER NOT NULL CHECK (nivel IN (50, 80, 100)),
         UNIQUE (orcamento_id, referencia, nivel)
       )''');
-    b.execute('''
+    lote.execute('''
       CREATE TABLE configuracoes (
         chave  TEXT PRIMARY KEY,
         valor  TEXT
       )''');
 
-    for (final c in categoriasPadrao) {
-      b.insert('categorias', {
-        'nome': c.$1,
-        'tipo': c.$2.name,
-        'cor': c.$3,
+    for (final categoria in categoriasPadrao) {
+      lote.insert('categorias', {
+        'nome': categoria.$1,
+        'tipo': categoria.$2.name,
+        'cor': categoria.$3,
       });
     }
-    await b.commit(noResult: true);
+    await lote.commit(noResult: true);
   }
 
   /// Decisão 12 do plano.

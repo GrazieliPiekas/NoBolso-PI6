@@ -2,8 +2,10 @@ import '../database/lancamento_dao.dart';
 import '../utils/formatadores.dart';
 import 'orcamento_service.dart';
 
+/// Tipo da dica (muda a cor do cartão na tela).
 enum TipoRecomendacao { alerta, dica, info, positivo }
 
+/// Uma dica mostrada em Relatórios.
 class Recomendacao {
   final String titulo;
   final String descricao;
@@ -31,6 +33,8 @@ class RecomendacaoService {
   }) : _lancamentos = lancamentos ?? LancamentoDao(),
        _orcamentos = orcamentos ?? OrcamentoService();
 
+  /// Aplica as 4 regras e devolve as dicas do período.
+  /// Se nenhuma regra disparar, devolve uma mensagem positiva.
   Future<List<Recomendacao>> gerar(Periodo periodo, {DateTime? hoje}) async {
     final agora = hoje ?? DateTime.now();
     return aplicarRegras(
@@ -48,11 +52,11 @@ class RecomendacaoService {
     required Map<String, (int, int)> porDia,
     required List<StatusOrcamento> orcamentosDoMes,
   }) {
-    final r = <Recomendacao>[];
+    final recomendacoes = <Recomendacao>[];
 
     // Regra 4: despesas maiores que receitas.
     if (totais.despesas > totais.receitas && totais.despesas > 0) {
-      r.add(
+      recomendacoes.add(
         Recomendacao(
           'Despesas acima das receitas',
           'Você gastou ${Formatadores.moeda(totais.despesas - totais.receitas)} '
@@ -64,17 +68,20 @@ class RecomendacaoService {
 
     // Regra 2: categorias acima de 80% do orçamento do mês.
     final apertados =
-        orcamentosDoMes.where((s) => s.percentual >= 0.8).toList()
-          ..sort((a, b) => b.percentual.compareTo(a.percentual));
-    for (final s in apertados) {
-      final p = (s.percentual * 100).round();
-      r.add(
+        orcamentosDoMes.where((status) => status.percentual >= 0.8).toList()
+          ..sort(
+            (primeiro, segundo) =>
+                segundo.percentual.compareTo(primeiro.percentual),
+          );
+    for (final status in apertados) {
+      final porcentagem = (status.percentual * 100).round();
+      recomendacoes.add(
         Recomendacao(
-          '${s.orcamento.nome} chegou a $p% do limite',
-          s.disponivel >= 0
-              ? 'Restam ${Formatadores.moeda(s.disponivel)} até o fim do mês.'
-              : 'Passou ${Formatadores.moeda(-s.disponivel)} do limite de '
-                    '${Formatadores.moeda(s.limite)}. Que tal segurar um pouco?',
+          '${status.orcamento.nome} chegou a $porcentagem% do limite',
+          status.disponivel >= 0
+              ? 'Restam ${Formatadores.moeda(status.disponivel)} até o fim do mês.'
+              : 'Passou ${Formatadores.moeda(-status.disponivel)} do limite de '
+                    '${Formatadores.moeda(status.limite)}. Que tal segurar um pouco?',
           TipoRecomendacao.alerta,
         ),
       );
@@ -83,11 +90,11 @@ class RecomendacaoService {
     // Regra 1: categoria com maior gasto.
     if (porCategoria.isNotEmpty && totais.despesas > 0) {
       final maior = porCategoria.first;
-      final p = (maior.totalCentavos * 100 / totais.despesas).round();
-      r.add(
+      final porcentagem = (maior.totalCentavos * 100 / totais.despesas).round();
+      recomendacoes.add(
         Recomendacao(
           'Maior gasto: ${maior.nome}',
-          '${Formatadores.moeda(maior.totalCentavos)}, $p% das suas despesas no período.',
+          '${Formatadores.moeda(maior.totalCentavos)}, $porcentagem% das suas despesas no período.',
           TipoRecomendacao.dica,
         ),
       );
@@ -96,7 +103,7 @@ class RecomendacaoService {
     // Regra 3: dia da semana com maior gasto.
     final dia = diaMaisGasto(porDia);
     if (dia != null) {
-      r.add(
+      recomendacoes.add(
         Recomendacao(
           '${dia.nome} concentra ${(dia.fracao * 100).round()}% dos gastos',
           'Planejar as compras desse dia ajuda a controlar o mês.',
@@ -108,7 +115,7 @@ class RecomendacaoService {
     // Reforço positivo quando sobra dinheiro.
     if (totais.saldo > 0 && totais.receitas > 0) {
       final guardar = (totais.saldo * 0.1).round();
-      r.add(
+      recomendacoes.add(
         Recomendacao(
           'Guarde ${Formatadores.moedaCurta(guardar)}',
           'É 10% do seu saldo positivo no período. Bom trabalho!',
@@ -117,8 +124,8 @@ class RecomendacaoService {
       );
     }
 
-    if (r.isEmpty) {
-      r.add(
+    if (recomendacoes.isEmpty) {
+      recomendacoes.add(
         const Recomendacao(
           'Ainda sem recomendações',
           'Registre alguns lançamentos para receber dicas sobre seus gastos.',
@@ -126,16 +133,17 @@ class RecomendacaoService {
         ),
       );
     }
-    return r;
+    return recomendacoes;
   }
 
+  /// Soma as despesas por dia da semana e devolve o dia que mais gastou.
   static DestaqueDiaSemana? diaMaisGasto(Map<String, (int, int)> porDia) {
     final somas = List<int>.filled(7, 0);
     var total = 0;
-    porDia.forEach((data, v) {
-      final d = Formatadores.dataDoDb(data);
-      somas[d.weekday - 1] += v.$2;
-      total += v.$2;
+    porDia.forEach((data, totaisDoDia) {
+      final dataDoGasto = Formatadores.dataDoDb(data);
+      somas[dataDoGasto.weekday - 1] += totaisDoDia.$2;
+      total += totaisDoDia.$2;
     });
     if (total == 0) return null;
     var idx = 0;
