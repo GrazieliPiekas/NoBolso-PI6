@@ -19,6 +19,7 @@ class MapaCalorPainter extends CustomPainter {
   static const corMinima = Color(0xFFE4E2D6);
   static const corMaxima = Color(0xFF3E6A46);
 
+  /// Cor da célula: quanto maior a fração (0 a 1), mais escuro o verde.
   static Color corPara(double fracao) =>
       Color.lerp(corMinima, corMaxima, fracao.clamp(0.0, 1.0))!;
 
@@ -42,33 +43,33 @@ class MapaCalorPainter extends CustomPainter {
       fontSize: 11,
       fontWeight: FontWeight.w700,
     );
-    for (var c = 0; c < 7; c++) {
+    for (var coluna = 0; coluna < 7; coluna++) {
       desenharTexto(
         canvas,
-        Formatadores.diasSemanaCurtos[c],
-        Offset(x0 + celula * (c + 0.5), alturaCabecalho / 2),
+        Formatadores.diasSemanaCurtos[coluna],
+        Offset(x0 + celula * (coluna + 0.5), alturaCabecalho / 2),
         estilo: estiloCab,
       );
     }
 
     final maximo = matriz.maximo;
-    for (var l = 0; l < linhas; l++) {
-      final y = y0 + celula * l;
+    for (var linha = 0; linha < linhas; linha++) {
+      final y = y0 + celula * linha;
       desenharTexto(
         canvas,
-        matriz.rotulosLinhas[l],
+        matriz.rotulosLinhas[linha],
         Offset(x0 - 6, y + celula / 2),
         ancora: Ancora.direita,
         estilo: const TextStyle(color: Cores.textoSuave, fontSize: 10),
       );
-      for (var c = 0; c < 7; c++) {
-        final v = matriz.valores[l][c];
-        if (v == null) continue;
-        final fracao = maximo == 0 ? 0.0 : v / maximo;
+      for (var coluna = 0; coluna < 7; coluna++) {
+        final valor = matriz.valores[linha][coluna];
+        if (valor == null) continue;
+        final fracao = maximo == 0 ? 0.0 : valor / maximo;
         // Animação: as células "acendem" do claro até a cor final.
         final cor = corPara(fracao * progresso);
         final rect = Rect.fromLTWH(
-          x0 + celula * c + espaco / 2,
+          x0 + celula * coluna + espaco / 2,
           y + espaco / 2,
           celula - espaco,
           celula - espaco,
@@ -82,8 +83,8 @@ class MapaCalorPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(MapaCalorPainter old) =>
-      old.progresso != progresso || old.matriz != matriz;
+  bool shouldRepaint(MapaCalorPainter anterior) =>
+      anterior.progresso != progresso || anterior.matriz != matriz;
 
   /// Altura ideal para uma largura, mantendo as células quadradas.
   static double alturaPara(double largura, int linhas) {

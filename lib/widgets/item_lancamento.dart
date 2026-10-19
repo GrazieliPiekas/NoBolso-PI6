@@ -20,11 +20,12 @@ class ItemLancamento extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l = lancamento;
-    final receita = l.tipo == Tipo.receita;
-    final sub = mostrarData
-        ? '${l.categoriaNome ?? ''} · ${Formatadores.dataCurta(l.data)}'
-        : l.categoriaNome ?? '';
+    final receita = lancamento.tipo == Tipo.receita;
+    final sub = [
+      lancamento.categoriaNome ?? '',
+      if (mostrarData) Formatadores.dataCurta(lancamento.data),
+      if (lancamento.fixo) 'fixo',
+    ].join(' · ');
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(14),
@@ -34,8 +35,8 @@ class ItemLancamento extends StatelessWidget {
           children: [
             CircleAvatar(
               radius: 18,
-              backgroundColor: l.corCategoria.withValues(alpha: 0.15),
-              child: Bolinha(l.corCategoria),
+              backgroundColor: lancamento.corCategoria.withValues(alpha: 0.15),
+              child: Bolinha(lancamento.corCategoria),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -43,7 +44,7 @@ class ItemLancamento extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    l.descricao,
+                    lancamento.descricao,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(fontSize: 15, color: Cores.texto),
@@ -60,7 +61,10 @@ class ItemLancamento extends StatelessWidget {
             ),
             const SizedBox(width: 8),
             Text(
-              Formatadores.moedaComSinal(l.valorCentavos, positivo: receita),
+              Formatadores.moedaComSinal(
+                lancamento.valorCentavos,
+                positivo: receita,
+              ),
               style: TextStyle(
                 fontWeight: FontWeight.w700,
                 color: receita ? Cores.verde : Cores.despesa,

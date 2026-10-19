@@ -28,7 +28,7 @@ class _GraficoAnimadoState extends State<GraficoAnimado>
     vsync: this,
     duration: const Duration(milliseconds: 900),
   );
-  late final Animation<double> _anim = CurvedAnimation(
+  late final Animation<double> _animacao = CurvedAnimation(
     parent: _controle,
     curve: EasingBezier.suave,
   );
@@ -40,9 +40,9 @@ class _GraficoAnimadoState extends State<GraficoAnimado>
   }
 
   @override
-  void didUpdateWidget(GraficoAnimado old) {
-    super.didUpdateWidget(old);
-    if (old.chave != widget.chave) _controle.forward(from: 0);
+  void didUpdateWidget(GraficoAnimado anterior) {
+    super.didUpdateWidget(anterior);
+    if (anterior.chave != widget.chave) _controle.forward(from: 0);
   }
 
   @override
@@ -58,8 +58,9 @@ class _GraficoAnimadoState extends State<GraficoAnimado>
       height: widget.altura,
       width: double.infinity,
       child: AnimatedBuilder(
-        animation: _anim,
-        builder: (_, _) => CustomPaint(painter: widget.painter(_anim.value)),
+        animation: _animacao,
+        builder: (_, _) =>
+            CustomPaint(painter: widget.painter(_animacao.value)),
       ),
     ),
   );

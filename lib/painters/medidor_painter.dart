@@ -14,11 +14,12 @@ class MedidorPainter extends CustomPainter {
 
   MedidorPainter(this.percentual, {this.progresso = 1});
 
-  static Color corDaFaixa(double p) => p >= 1
+  /// Verde até 50%, amarelo até 80%, laranja até 100% e vermelho depois disso.
+  static Color corDaFaixa(double preenchido) => preenchido >= 1
       ? Cores.despesa
-      : p >= 0.8
+      : preenchido >= 0.8
       ? Cores.alerta
-      : p >= 0.5
+      : preenchido >= 0.5
       ? const Color(0xFF5E8A55)
       : Cores.verde;
 
@@ -36,8 +37,8 @@ class MedidorPainter extends CustomPainter {
       ..strokeCap = StrokeCap.round;
     canvas.drawArc(rect, math.pi, math.pi, false, fundo);
 
-    final p = percentual * progresso;
-    final varredura = math.pi * math.min(p, 1.0);
+    final preenchido = percentual * progresso;
+    final varredura = math.pi * math.min(preenchido, 1.0);
     if (varredura > 0) {
       canvas.drawArc(
         rect,
@@ -45,7 +46,7 @@ class MedidorPainter extends CustomPainter {
         varredura,
         false,
         Paint()
-          ..color = corDaFaixa(p)
+          ..color = corDaFaixa(preenchido)
           ..style = PaintingStyle.stroke
           ..strokeWidth = espessura
           ..strokeCap = StrokeCap.round,
@@ -83,6 +84,6 @@ class MedidorPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(MedidorPainter old) =>
-      old.percentual != percentual || old.progresso != progresso;
+  bool shouldRepaint(MedidorPainter anterior) =>
+      anterior.percentual != percentual || anterior.progresso != progresso;
 }

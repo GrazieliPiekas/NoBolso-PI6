@@ -1,4 +1,4 @@
-﻿import 'dart:ui';
+import 'dart:ui';
 
 import 'package:flutter/animation.dart';
 
@@ -30,7 +30,8 @@ List<(Offset, Offset)> controlesCatmullRom(List<Offset> pts) => [
   for (var i = 0; i < pts.length - 1; i++)
     (
       pts[i] + (pts[i + 1] - pts[i == 0 ? 0 : i - 1]) / 6,
-      pts[i + 1] - (pts[i + 2 < pts.length ? i + 2 : pts.length - 1] - pts[i]) / 6,
+      pts[i + 1] -
+          (pts[i + 2 < pts.length ? i + 2 : pts.length - 1] - pts[i]) / 6,
     ),
 ];
 
@@ -62,16 +63,16 @@ class EasingBezier extends Curve {
     for (var i = 0; i < 8; i++) {
       final erro = _bezier(t, x1, x2) - x;
       if (erro.abs() < 1e-6) return t;
-      final d = _derivada(t, x1, x2);
-      if (d.abs() < 1e-6) break;
-      t -= erro / d;
+      final inclinacao = _derivada(t, x1, x2);
+      if (inclinacao.abs() < 1e-6) break;
+      t -= erro / inclinacao;
     }
     var baixo = 0.0, alto = 1.0;
     t = x;
     for (var i = 0; i < 30; i++) {
-      final v = _bezier(t, x1, x2);
-      if ((v - x).abs() < 1e-6) break;
-      if (v < x) {
+      final xCalculado = _bezier(t, x1, x2);
+      if ((xCalculado - x).abs() < 1e-6) break;
+      if (xCalculado < x) {
         baixo = t;
       } else {
         alto = t;

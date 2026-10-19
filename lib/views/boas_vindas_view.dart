@@ -1,48 +1,51 @@
 import 'package:flutter/material.dart';
 
-import '../database/configuracao_dao.dart';
 import '../theme/app_theme.dart';
-import 'abertura_screen.dart';
+import '../viewmodels/boas_vindas_view_model.dart';
+import 'abertura_view.dart';
 
 /// Primeira abertura: pergunta como chamar a pessoa (opcional). Sem cadastro nem login.
-class BoasVindasScreen extends StatefulWidget {
+class BoasVindasView extends StatefulWidget {
   final VoidCallback onConcluir;
-  const BoasVindasScreen({super.key, required this.onConcluir});
+  const BoasVindasView({super.key, required this.onConcluir});
 
   @override
-  State<BoasVindasScreen> createState() => _BoasVindasScreenState();
+  State<BoasVindasView> createState() => _BoasVindasViewState();
 }
 
-class _BoasVindasScreenState extends State<BoasVindasScreen> {
+class _BoasVindasViewState extends State<BoasVindasView> {
   final _nome = TextEditingController();
-  final _dao = ConfiguracaoDao();
-  bool _salvando = false;
+  // ViewModel da tela (MVVM): guarda os dados e faz as ações.
+  // A tela só desenha, e o ListenableBuilder redesenha quando ele avisa.
+  final _viewModel = BoasVindasViewModel();
 
   @override
   void dispose() {
     _nome.dispose();
+    _viewModel.dispose();
     super.dispose();
   }
 
   Future<void> _concluir({required bool comNome}) async {
-    setState(() => _salvando = true);
-    if (comNome && _nome.text.trim().isNotEmpty) {
-      await _dao.salvarNome(_nome.text);
-    }
-    await _dao.marcarBoasVindasVista();
+    await _viewModel.concluir(comNome ? _nome.text : null);
     widget.onConcluir();
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
+  Widget build(BuildContext context) => ListenableBuilder(
+    listenable: _viewModel,
+    builder: (context, _) => _corpo(),
+  );
+
+  Widget _corpo() => Scaffold(
     body: DecoratedBox(
       decoration: const BoxDecoration(gradient: degradeVerde),
       child: SafeArea(
         child: LayoutBuilder(
-          builder: (context, c) => SingleChildScrollView(
+          builder: (context, limites) => SingleChildScrollView(
             padding: const EdgeInsets.symmetric(horizontal: 28),
             child: ConstrainedBox(
-              constraints: BoxConstraints(minHeight: c.maxHeight),
+              constraints: BoxConstraints(minHeight: limites.maxHeight),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -80,13 +83,13 @@ class _BoasVindasScreenState extends State<BoasVindasScreen> {
                       backgroundColor: Cores.creme,
                       foregroundColor: Cores.verdeEscuro,
                     ),
-                    onPressed: _salvando
+                    onPressed: _viewModel.salvando
                         ? null
                         : () => _concluir(comNome: true),
                     child: const Text('Começar'),
                   ),
                   TextButton(
-                    onPressed: _salvando
+                    onPressed: _viewModel.salvando
                         ? null
                         : () => _concluir(comNome: false),
                     child: const Text(

@@ -16,6 +16,7 @@ class StatusOrcamento {
   int get nivel => OrcamentoService.nivelAtingido(percentual);
 }
 
+/// Situação de todos os orçamentos do mês (o geral e os por categoria).
 class ResumoOrcamentos {
   final StatusOrcamento? geral;
   final List<StatusOrcamento> categorias;
@@ -25,8 +26,9 @@ class ResumoOrcamentos {
   bool get vazio => geral == null && categorias.isEmpty;
 
   int get somaLimitesCategorias =>
-      categorias.fold(0, (s, c) => s + c.limite);
-  int get somaUsadoCategorias => categorias.fold(0, (s, c) => s + c.usado);
+      categorias.fold(0, (soma, item) => soma + item.limite);
+  int get somaUsadoCategorias =>
+      categorias.fold(0, (soma, item) => soma + item.usado);
 
   /// Decisão 3: o medidor mostra o geral; sem geral, usa a soma dos limites por categoria.
   bool get medidorPelaSoma => geral == null;
@@ -40,6 +42,7 @@ class ResumoOrcamentos {
       geral != null && somaLimitesCategorias > geral!.limite;
 }
 
+/// Regras de orçamento: quanto foi usado, quanto falta e quando avisar.
 class OrcamentoService {
   final OrcamentoDao _orcamentos;
   final LancamentoDao _lancamentos;
@@ -55,29 +58,32 @@ class OrcamentoService {
 
   static const niveis = [50, 80, 100];
 
-  static int nivelAtingido(double p) => p >= 1
+  /// Maior nível de alerta atingido: 100, 80, 50 ou 0 se ainda não chegou em 50%.
+  static int nivelAtingido(double percentual) => percentual >= 1
       ? 100
-      : p >= 0.8
+      : percentual >= 0.8
       ? 80
-      : p >= 0.5
+      : percentual >= 0.5
       ? 50
       : 0;
 
+  /// Calcula usado/disponível de cada orçamento no mês.
+  /// O "usado" não fica salvo, é sempre somado na hora a partir dos lançamentos.
   Future<ResumoOrcamentos> resumo(DateTime mes) async {
     final periodo = Periodo.mes(mes);
     final lista = await _orcamentos.listar();
     StatusOrcamento? geral;
     final categorias = <StatusOrcamento>[];
-    for (final o in lista) {
+    for (final orcamento in lista) {
       final usado = await _lancamentos.despesasDaCategoria(
-        o.categoriaId,
+        orcamento.categoriaId,
         periodo,
       );
-      final s = StatusOrcamento(o, usado);
-      if (o.geral) {
-        geral = s;
+      final status = StatusOrcamento(orcamento, usado);
+      if (orcamento.geral) {
+        geral = status;
       } else {
-        categorias.add(s);
+        categorias.add(status);
       }
     }
     return ResumoOrcamentos(geral, categorias);
@@ -90,23 +96,27 @@ class OrcamentoService {
   Future<List<String>> verificarAlertas({DateTime? hoje}) async {
     final agora = hoje ?? DateTime.now();
     final referencia = Formatadores.referenciaMes(agora);
-    final r = await resumo(agora);
+    final resumoDoMes = await resumo(agora);
     final mensagens = <String>[];
-    for (final s in [?r.geral, ...r.categorias]) {
-      final nivel = s.nivel;
+    for (final status in [?resumoDoMes.geral, ...resumoDoMes.categorias]) {
+      final nivel = status.nivel;
       if (nivel == 0) continue;
       final enviados = await _orcamentos.niveisEnviados(
-        s.orcamento.id!,
+        status.orcamento.id!,
         referencia,
       );
       if (enviados.contains(nivel)) continue;
-      for (final n in niveis.where((n) => n <= nivel)) {
-        await _orcamentos.registrarAlerta(s.orcamento.id!, referencia, n);
+      for (final faixa in niveis.where((faixa) => faixa <= nivel)) {
+        await _orcamentos.registrarAlerta(
+          status.orcamento.id!,
+          referencia,
+          faixa,
+        );
       }
-      final (titulo, corpo) = mensagemAlerta(s, nivel);
+      final (titulo, corpo) = mensagemAlerta(status, nivel);
       mensagens.add('$titulo. $corpo');
       await _notificacoes.mostrar(
-        id: s.orcamento.id! * 1000 + nivel,
+        id: status.orcamento.id! * 1000 + nivel,
         titulo: titulo,
         corpo: corpo,
       );
@@ -115,24 +125,24 @@ class OrcamentoService {
   }
 
   /// Tom claro e não punitivo (RF05).
-  static (String, String) mensagemAlerta(StatusOrcamento s, int nivel) {
-    final nome = s.orcamento.geral
+  static (String, String) mensagemAlerta(StatusOrcamento status, int nivel) {
+    final nome = status.orcamento.geral
         ? 'Seu orçamento do mês'
-        : 'O orçamento de ${s.orcamento.nome}';
-    final resta = Formatadores.moeda(s.disponivel.clamp(0, 1 << 62));
+        : 'O orçamento de ${status.orcamento.nome}';
+    final resta = Formatadores.moeda(status.disponivel.clamp(0, 1 << 62));
     return switch (nivel) {
       50 => (
         '$nome está na metade',
-        'Você já usou ${(s.percentual * 100).round()}% e ainda restam $resta este mês.',
+        'Você já usou ${(status.percentual * 100).round()}% e ainda restam $resta este mês.',
       ),
       80 => (
-        '$nome chegou a ${(s.percentual * 100).round()}%',
+        '$nome chegou a ${(status.percentual * 100).round()}%',
         'Restam $resta até o fim do mês. Dá para ajustar com calma.',
       ),
       _ => (
         '$nome chegou ao limite',
-        s.disponivel < 0
-            ? 'Passou ${Formatadores.moeda(-s.disponivel)} do planejado. Tudo bem: você pode rever os próximos gastos ou ajustar o limite.'
+        status.disponivel < 0
+            ? 'Passou ${Formatadores.moeda(-status.disponivel)} do planejado. Tudo bem: você pode rever os próximos gastos ou ajustar o limite.'
             : 'Que tal rever os próximos gastos? Você pode ajustar o limite quando quiser.',
       ),
     };

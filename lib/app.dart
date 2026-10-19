@@ -2,16 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
-import 'database/configuracao_dao.dart';
-import 'screens/abertura_screen.dart';
-import 'screens/analise_screen.dart';
-import 'screens/boas_vindas_screen.dart';
-import 'screens/inicio_screen.dart';
-import 'screens/lancamento_form_screen.dart';
-import 'screens/orcamentos_screen.dart';
-import 'screens/relatorios_screen.dart';
 import 'theme/app_theme.dart';
+import 'viewmodels/raiz_view_model.dart';
+import 'views/abertura_view.dart';
+import 'views/analise_view.dart';
+import 'views/boas_vindas_view.dart';
+import 'views/inicio_view.dart';
+import 'views/lancamento_form_view.dart';
+import 'views/menu_lateral.dart';
+import 'views/orcamentos_view.dart';
+import 'views/relatorios_view.dart';
 
+/// Widget raiz do app: tema, idioma pt-BR e a primeira tela (RaizView).
 class NoBolsoApp extends StatelessWidget {
   const NoBolsoApp({super.key});
 
@@ -27,51 +29,45 @@ class NoBolsoApp extends StatelessWidget {
       GlobalWidgetsLocalizations.delegate,
       GlobalCupertinoLocalizations.delegate,
     ],
-    home: const RaizScreen(),
+    home: const RaizView(),
   );
 }
 
 /// Mostra a abertura enquanto o banco é aberto e decide entre boas-vindas e o app.
-class RaizScreen extends StatefulWidget {
-  const RaizScreen({super.key});
+class RaizView extends StatefulWidget {
+  const RaizView({super.key});
   @override
-  State<RaizScreen> createState() => _RaizScreenState();
+  State<RaizView> createState() => _RaizViewState();
 }
 
-class _RaizScreenState extends State<RaizScreen> {
-  bool? _boasVindasVista;
+class _RaizViewState extends State<RaizView> {
+  // ViewModel da tela (MVVM): guarda os dados e faz as ações.
+  // A tela só desenha, e o ListenableBuilder redesenha quando ele avisa.
+  final _viewModel = RaizViewModel();
 
   @override
-  void initState() {
-    super.initState();
-    _carregar();
-  }
-
-  Future<void> _carregar() async {
-    final resultados = await Future.wait([
-      ConfiguracaoDao().boasVindasVista(),
-      // Deixa a marca visível por um instante, mesmo com o banco já pronto.
-      Future.delayed(const Duration(milliseconds: 700), () => true),
-    ]);
-    if (mounted) setState(() => _boasVindasVista = resultados.first);
+  void dispose() {
+    _viewModel.dispose();
+    super.dispose();
   }
 
   @override
-  Widget build(BuildContext context) => AnimatedSwitcher(
-    duration: const Duration(milliseconds: 400),
-    child: switch (_boasVindasVista) {
-      null => const AnnotatedRegion(
-        value: SystemUiOverlayStyle.light,
-        child: AberturaScreen(),
-      ),
-      false => AnnotatedRegion(
-        value: SystemUiOverlayStyle.light,
-        child: BoasVindasScreen(
-          onConcluir: () => setState(() => _boasVindasVista = true),
+  Widget build(BuildContext context) => ListenableBuilder(
+    listenable: _viewModel,
+    builder: (context, _) => AnimatedSwitcher(
+      duration: const Duration(milliseconds: 400),
+      child: switch (_viewModel.boasVindasVista) {
+        null => const AnnotatedRegion(
+          value: SystemUiOverlayStyle.light,
+          child: AberturaView(),
         ),
-      ),
-      true => const NavegacaoPrincipal(),
-    },
+        false => AnnotatedRegion(
+          value: SystemUiOverlayStyle.light,
+          child: BoasVindasView(onConcluir: _viewModel.boasVindasConcluidas),
+        ),
+        true => const NavegacaoPrincipal(),
+      },
+    ),
   );
 }
 
@@ -86,14 +82,15 @@ class _NavegacaoPrincipalState extends State<NavegacaoPrincipal> {
   int _aba = 0;
 
   static const _abas = <Widget>[
-    InicioScreen(),
-    AnaliseScreen(),
-    OrcamentosScreen(),
-    RelatoriosScreen(),
+    InicioView(),
+    AnaliseView(),
+    OrcamentosView(),
+    RelatoriosView(),
   ];
 
   @override
   Widget build(BuildContext context) => Scaffold(
+    drawer: const MenuLateral(),
     // Ícones claros na barra de status sobre o cabeçalho verde do Início.
     body: AnnotatedRegion(
       value: _aba == 0 ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark,
@@ -102,11 +99,12 @@ class _NavegacaoPrincipalState extends State<NavegacaoPrincipal> {
     bottomNavigationBar: _BarraInferior(
       aba: _aba,
       aoTrocar: (i) => setState(() => _aba = i),
-      aoAdicionar: () => LancamentoFormScreen.abrir(context),
+      aoAdicionar: () => LancamentoFormView.abrir(context),
     ),
   );
 }
 
+/// Barra de baixo com as 4 abas e o botão + no meio para lançar rápido.
 class _BarraInferior extends StatelessWidget {
   final int aba;
   final ValueChanged<int> aoTrocar;

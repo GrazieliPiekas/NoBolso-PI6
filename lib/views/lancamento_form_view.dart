@@ -1,200 +1,145 @@
 import 'package:flutter/material.dart';
 
-import '../database/categoria_dao.dart';
-import '../database/lancamento_dao.dart';
-import '../models/categoria.dart';
 import '../models/lancamento.dart';
 import '../models/tipo.dart';
-import '../services/orcamento_service.dart';
 import '../theme/app_theme.dart';
-import '../utils/eventos.dart';
 import '../utils/formatadores.dart';
 import '../utils/moeda_input_formatter.dart';
-import '../utils/validadores.dart';
+import '../viewmodels/lancamento_form_view_model.dart';
 import '../widgets/componentes.dart';
 import 'categoria_form_dialog.dart';
 
 /// Novo / editar lançamento. Fluxo curto (RF12): tipo → valor → categoria → salvar;
 /// data já vem como hoje e a descrição é sugerida pela categoria se ficar vazia.
-class LancamentoFormScreen extends StatefulWidget {
+class LancamentoFormView extends StatefulWidget {
   final Lancamento? editar;
-  const LancamentoFormScreen({super.key, this.editar});
+  const LancamentoFormView({super.key, this.editar});
 
   static Future<void> abrir(BuildContext context, {Lancamento? editar}) =>
       Navigator.of(context).push(
         MaterialPageRoute(
           fullscreenDialog: true,
-          builder: (_) => LancamentoFormScreen(editar: editar),
+          builder: (_) => LancamentoFormView(editar: editar),
         ),
       );
 
   @override
-  State<LancamentoFormScreen> createState() => _LancamentoFormScreenState();
+  State<LancamentoFormView> createState() => _LancamentoFormViewState();
 }
 
-class _LancamentoFormScreenState extends State<LancamentoFormScreen> {
-  final _categoriasDao = CategoriaDao();
-  final _dao = LancamentoDao();
+class _LancamentoFormViewState extends State<LancamentoFormView> {
+  // ViewModel da tela (MVVM): guarda os dados e faz as ações.
+  // A tela só desenha, e o ListenableBuilder redesenha quando ele avisa.
+  late final _viewModel = LancamentoFormViewModel(editar: widget.editar);
   final _valor = TextEditingController();
   final _descricao = TextEditingController();
-
-  late Tipo _tipo;
-  int? _categoriaId;
-  late DateTime _data;
-  List<Categoria> _categorias = [];
-  bool _carregando = true;
-  bool _salvando = false;
-  String? _erroValor;
-  String? _erroCategoria;
-
-  bool get _edicao => widget.editar != null;
 
   @override
   void initState() {
     super.initState();
-    final e = widget.editar;
-    _tipo = e?.tipo ?? Tipo.despesa;
-    _categoriaId = e?.categoriaId;
-    _data = e?.data ?? DateTime.now();
-    if (e != null) {
-      _valor.text = MoedaInputFormatter.formatar(e.valorCentavos);
-      _descricao.text = e.descricao;
+    final lancamentoEditado = widget.editar;
+    if (lancamentoEditado != null) {
+      _valor.text = MoedaInputFormatter.formatar(
+        lancamentoEditado.valorCentavos,
+      );
+      _descricao.text = lancamentoEditado.descricao;
     }
-    _carregarCategorias();
   }
 
   @override
   void dispose() {
     _valor.dispose();
     _descricao.dispose();
+    _viewModel.dispose();
     super.dispose();
   }
 
-  Future<void> _carregarCategorias() async {
-    final lista = await _categoriasDao.listar(tipo: _tipo);
-    if (!mounted) return;
-    setState(() {
-      _categorias = lista;
-      _carregando = false;
-      if (!lista.any((c) => c.id == _categoriaId)) _categoriaId = null;
-    });
-  }
-
-  void _trocarTipo(Tipo t) {
-    if (t == _tipo) return;
-    setState(() {
-      _tipo = t;
-      _categoriaId = null;
-      _erroCategoria = null;
-    });
-    _carregarCategorias();
-  }
-
   Future<void> _novaCategoria() async {
-    final nova = await CategoriaFormDialog.abrir(context, tipoFixo: _tipo);
-    if (nova == null) return;
-    await _carregarCategorias();
-    setState(() {
-      _categoriaId = nova.id;
-      _erroCategoria = null;
-    });
+    final nova = await CategoriaFormDialog.abrir(
+      context,
+      tipoFixo: _viewModel.tipo,
+    );
+    if (nova != null) await _viewModel.categoriaCriada(nova);
   }
 
   Future<void> _escolherData() async {
-    final d = await showDatePicker(
+    final dataEscolhida = await showDatePicker(
       context: context,
-      initialDate: _data,
+      initialDate: _viewModel.data,
       firstDate: DateTime(2000),
       lastDate: DateTime(2100),
     );
-    if (d != null) setState(() => _data = d);
+    if (dataEscolhida != null) _viewModel.definirData(dataEscolhida);
   }
 
   Future<void> _salvar() async {
-    // RF11: valida valor e categoria antes de salvar.
-    setState(() {
-      _erroValor = Validadores.valor(_valor.text);
-      _erroCategoria = Validadores.categoria(_categoriaId);
-    });
-    if (_erroValor != null || _erroCategoria != null) return;
-
-    final categoria = _categorias.firstWhere((c) => c.id == _categoriaId);
-    final descricao = _descricao.text.trim().isEmpty
-        ? categoria.nome
-        : _descricao.text.trim();
-    final l = Lancamento(
-      id: widget.editar?.id,
-      descricao: descricao,
-      valorCentavos: Formatadores.centavosDeTexto(_valor.text)!,
-      tipo: _tipo,
-      categoriaId: _categoriaId!,
-      data: _data,
-    );
-
-    setState(() => _salvando = true);
+    final List<String>? alertas;
     try {
-      if (_edicao) {
-        await _dao.atualizar(l);
-      } else {
-        await _dao.inserir(l);
-      }
-      final alertas = await OrcamentoService().verificarAlertas();
-      Eventos.notificarDados();
-      if (!mounted) return;
-      // RF10: confirmação visível.
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            [
-              _edicao ? 'Lançamento atualizado' : 'Lançamento salvo',
-              ...alertas,
-            ].join('\n'),
-          ),
-          duration: Duration(seconds: alertas.isEmpty ? 2 : 5),
-        ),
+      alertas = await _viewModel.salvar(
+        valorTexto: _valor.text,
+        descricaoTexto: _descricao.text,
       );
-      Navigator.pop(context);
-    } catch (e) {
+    } catch (erro) {
       if (!mounted) return;
-      setState(() => _salvando = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Não foi possível salvar: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Não foi possível salvar: $erro')));
+      return;
     }
+    if (alertas == null || !mounted) return;
+    // RF10: confirmação visível.
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          [
+            _viewModel.edicao ? 'Lançamento atualizado' : 'Lançamento salvo',
+            ...alertas,
+          ].join('\n'),
+        ),
+        duration: Duration(seconds: alertas.isEmpty ? 2 : 5),
+      ),
+    );
+    Navigator.pop(context);
   }
 
   Future<void> _excluir() async {
-    final ok = await showDialog<bool>(
+    final confirmou = await showDialog<bool>(
       context: context,
-      builder: (c) => AlertDialog(
+      builder: (contextoDialogo) => AlertDialog(
         title: const Text('Excluir lançamento?'),
         content: const Text('Essa ação não pode ser desfeita.'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(c, false),
+            onPressed: () => Navigator.pop(contextoDialogo, false),
             child: const Text('Cancelar'),
           ),
           TextButton(
-            onPressed: () => Navigator.pop(c, true),
+            onPressed: () => Navigator.pop(contextoDialogo, true),
             style: TextButton.styleFrom(foregroundColor: Cores.despesa),
             child: const Text('Excluir'),
           ),
         ],
       ),
     );
-    if (ok != true) return;
-    await _dao.excluir(widget.editar!.id!);
-    Eventos.notificarDados();
+    if (confirmou != true) return;
+    await _viewModel.excluir();
     if (!mounted) return;
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('Lançamento excluído')));
+    ScaffoldMessenger.of(context)
+        .showSnackBar(const SnackBar(content: Text('Lançamento excluído')));
     Navigator.pop(context);
   }
 
+  // A tela também escuta o campo de valor: a linha abaixo dele muda de cor ao digitar.
   @override
-  Widget build(BuildContext context) {
-    final corTipo = _tipo == Tipo.despesa ? Cores.despesa : Cores.verde;
+  Widget build(BuildContext context) => ListenableBuilder(
+    listenable: Listenable.merge([_viewModel, _valor]),
+    builder: (context, _) => _corpo(),
+  );
+
+  Widget _corpo() {
+    final corTipo = _viewModel.tipo == Tipo.despesa
+        ? Cores.despesa
+        : Cores.verde;
     return Scaffold(
       backgroundColor: Cores.cabecalho,
       appBar: AppBar(
@@ -203,13 +148,15 @@ class _LancamentoFormScreenState extends State<LancamentoFormScreen> {
           tooltip: 'Fechar',
           onPressed: () => Navigator.pop(context),
         ),
-        title: Text(_edicao ? 'Editar lançamento' : 'Novo lançamento'),
+        title: Text(
+          _viewModel.edicao ? 'Editar lançamento' : 'Novo lançamento',
+        ),
         actions: [
-          if (_edicao)
+          if (_viewModel.edicao)
             IconButton(
               tooltip: 'Excluir',
               icon: const Icon(Icons.delete_outline),
-              onPressed: _salvando ? null : _excluir,
+              onPressed: _viewModel.salvando ? null : _excluir,
             ),
         ],
       ),
@@ -220,7 +167,10 @@ class _LancamentoFormScreenState extends State<LancamentoFormScreen> {
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
                 children: [
-                  _SeletorTipo(tipo: _tipo, aoTrocar: _trocarTipo),
+                  _SeletorTipo(
+                    tipo: _viewModel.tipo,
+                    aoTrocar: _viewModel.trocarTipo,
+                  ),
                   const SizedBox(height: 28),
                   const Center(
                     child: Text(
@@ -244,10 +194,10 @@ class _LancamentoFormScreenState extends State<LancamentoFormScreen> {
                         child: IntrinsicWidth(
                           child: TextField(
                             controller: _valor,
-                            autofocus: !_edicao,
+                            autofocus: !_viewModel.edicao,
                             keyboardType: TextInputType.number,
                             inputFormatters: [MoedaInputFormatter()],
-                            onChanged: (_) => setState(() => _erroValor = null),
+                            onChanged: (_) => _viewModel.limparErroValor(),
                             style: const TextStyle(
                               fontSize: 44,
                               fontWeight: FontWeight.w800,
@@ -268,17 +218,17 @@ class _LancamentoFormScreenState extends State<LancamentoFormScreen> {
                   Container(
                     height: 2,
                     margin: const EdgeInsets.symmetric(horizontal: 40),
-                    color: _erroValor != null
+                    color: _viewModel.erroValor != null
                         ? Cores.despesa
                         : _valor.text.isEmpty
                         ? Cores.trilho
                         : corTipo.withValues(alpha: 0.5),
                   ),
-                  if (_erroValor != null)
+                  if (_viewModel.erroValor != null)
                     Padding(
                       padding: const EdgeInsets.only(top: 6),
                       child: Text(
-                        _erroValor!,
+                        _viewModel.erroValor!,
                         textAlign: TextAlign.center,
                         style: const TextStyle(
                           color: Cores.despesa,
@@ -295,22 +245,20 @@ class _LancamentoFormScreenState extends State<LancamentoFormScreen> {
                     ),
                   ),
                   const SizedBox(height: 10),
-                  if (_carregando)
+                  if (_viewModel.carregando)
                     const LinearProgressIndicator(color: Cores.verde)
                   else
                     Wrap(
                       spacing: 8,
                       runSpacing: 8,
                       children: [
-                        for (final c in _categorias)
+                        for (final categoria in _viewModel.categorias)
                           _ChipCategoria(
-                            rotulo: c.nome,
-                            cor: c.color,
-                            selecionado: c.id == _categoriaId,
-                            onTap: () => setState(() {
-                              _categoriaId = c.id;
-                              _erroCategoria = null;
-                            }),
+                            rotulo: categoria.nome,
+                            cor: categoria.color,
+                            selecionado: categoria.id == _viewModel.categoriaId,
+                            onTap: () =>
+                                _viewModel.escolherCategoria(categoria.id),
                           ),
                         _ChipCategoria(
                           rotulo: '+ Nova',
@@ -320,11 +268,11 @@ class _LancamentoFormScreenState extends State<LancamentoFormScreen> {
                         ),
                       ],
                     ),
-                  if (_erroCategoria != null)
+                  if (_viewModel.erroCategoria != null)
                     Padding(
                       padding: const EdgeInsets.only(top: 8, left: 4),
                       child: Text(
-                        _erroCategoria!,
+                        _viewModel.erroCategoria!,
                         style: const TextStyle(
                           color: Cores.despesa,
                           fontSize: 12,
@@ -334,7 +282,7 @@ class _LancamentoFormScreenState extends State<LancamentoFormScreen> {
                   const SizedBox(height: 22),
                   _CampoToque(
                     rotulo: 'Data',
-                    valor: Formatadores.dataLonga(_data),
+                    valor: Formatadores.dataLonga(_viewModel.data),
                     onTap: _escolherData,
                   ),
                   const SizedBox(height: 12),
@@ -348,14 +296,31 @@ class _LancamentoFormScreenState extends State<LancamentoFormScreen> {
                       contentPadding: EdgeInsets.fromLTRB(20, 18, 20, 18),
                     ),
                   ),
+                  // Opcional e desmarcado por padrão: não alonga o fluxo (RF12).
+                  CheckboxListTile(
+                    value: _viewModel.fixo,
+                    onChanged: (marcado) =>
+                        _viewModel.definirFixo(marcado ?? false),
+                    controlAffinity: ListTileControlAffinity.leading,
+                    contentPadding: EdgeInsets.zero,
+                    activeColor: corTipo,
+                    title: Text(
+                      _viewModel.tipo == Tipo.despesa
+                          ? 'Despesa fixa'
+                          : 'Receita fixa',
+                    ),
+                    subtitle: const Text(
+                      'Se repete todo mês (aluguel, salário...)',
+                    ),
+                  ),
                 ],
               ),
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
               child: FilledButton(
-                onPressed: _salvando ? null : _salvar,
-                child: _salvando
+                onPressed: _viewModel.salvando ? null : _salvar,
+                child: _viewModel.salvando
                     ? const SizedBox(
                         width: 22,
                         height: 22,
@@ -364,7 +329,11 @@ class _LancamentoFormScreenState extends State<LancamentoFormScreen> {
                           color: Colors.white,
                         ),
                       )
-                    : Text(_edicao ? 'Salvar alterações' : 'Salvar lançamento'),
+                    : Text(
+                        _viewModel.edicao
+                            ? 'Salvar alterações'
+                            : 'Salvar lançamento',
+                      ),
               ),
             ),
           ],
@@ -381,14 +350,14 @@ class _SeletorTipo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Widget opcao(Tipo t, Color cor) {
-      final ativo = t == tipo;
+    Widget opcao(Tipo tipoDaOpcao, Color cor) {
+      final ativo = tipoDaOpcao == tipo;
       return Expanded(
         child: Semantics(
           selected: ativo,
           button: true,
           child: GestureDetector(
-            onTap: () => aoTrocar(t),
+            onTap: () => aoTrocar(tipoDaOpcao),
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 200),
               height: 46,
@@ -398,7 +367,7 @@ class _SeletorTipo extends StatelessWidget {
                 borderRadius: BorderRadius.circular(14),
               ),
               child: Text(
-                t.rotulo,
+                tipoDaOpcao.rotulo,
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: ativo ? FontWeight.w700 : FontWeight.w400,

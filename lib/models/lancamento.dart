@@ -3,6 +3,7 @@ import 'dart:ui';
 import '../utils/formatadores.dart';
 import 'tipo.dart';
 
+/// Uma receita ou despesa registrada pelo usuário.
 class Lancamento {
   final int? id;
   final String descricao;
@@ -12,6 +13,9 @@ class Lancamento {
   final Tipo tipo;
   final int categoriaId;
   final DateTime data;
+
+  /// Receita ou despesa fixa (repete todo mês). BOOLEAN do SQLite: INTEGER 0/1.
+  final bool fixo;
 
   /// Preenchidos quando a consulta faz JOIN com categorias.
   final String? categoriaNome;
@@ -24,6 +28,7 @@ class Lancamento {
     required this.tipo,
     required this.categoriaId,
     required this.data,
+    this.fixo = false,
     this.categoriaNome,
     this.categoriaCor,
   });
@@ -37,16 +42,18 @@ class Lancamento {
     'tipo': tipo.name,
     'categoria_id': categoriaId,
     'data': Formatadores.dataParaDb(data),
+    'fixo': fixo ? 1 : 0,
   };
 
-  factory Lancamento.fromMap(Map<String, Object?> m) => Lancamento(
-    id: m['id'] as int,
-    descricao: m['descricao'] as String,
-    valorCentavos: m['valor_centavos'] as int,
-    tipo: Tipo.deTexto(m['tipo'] as String),
-    categoriaId: m['categoria_id'] as int,
-    data: Formatadores.dataDoDb(m['data'] as String),
-    categoriaNome: m['categoria_nome'] as String?,
-    categoriaCor: m['categoria_cor'] as int?,
+  factory Lancamento.fromMap(Map<String, Object?> mapa) => Lancamento(
+    id: mapa['id'] as int,
+    descricao: mapa['descricao'] as String,
+    valorCentavos: mapa['valor_centavos'] as int,
+    tipo: Tipo.deTexto(mapa['tipo'] as String),
+    categoriaId: mapa['categoria_id'] as int,
+    data: Formatadores.dataDoDb(mapa['data'] as String),
+    fixo: (mapa['fixo'] as int? ?? 0) == 1,
+    categoriaNome: mapa['categoria_nome'] as String?,
+    categoriaCor: mapa['categoria_cor'] as int?,
   );
 }

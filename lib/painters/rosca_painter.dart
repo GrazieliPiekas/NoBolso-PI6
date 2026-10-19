@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import 'texto.dart';
 
+/// Uma fatia da rosca: valor (define o tamanho do arco) e cor.
 class FatiaRosca {
   final double valor;
   final Color cor;
@@ -35,7 +36,7 @@ class RoscaPainter extends CustomPainter {
     final externo = Rect.fromCircle(center: centro, radius: raioExterno);
     final interno = Rect.fromCircle(center: centro, radius: raioInterno);
 
-    final total = fatias.fold<double>(0, (s, f) => s + f.valor);
+    final total = fatias.fold<double>(0, (soma, fatia) => soma + fatia.valor);
     if (total <= 0) {
       // Sem dados: anel vazio.
       canvas.drawPath(
@@ -45,14 +46,14 @@ class RoscaPainter extends CustomPainter {
     } else {
       var inicio = -math.pi / 2;
       // Com uma fatia só (100%), o separador apareceria como um corte no topo.
-      final variasFatias = fatias.where((f) => f.valor > 0).length > 1;
+      final variasFatias = fatias.where((fatia) => fatia.valor > 0).length > 1;
       final separador = Paint()
         ..color = Cores.cartao
         ..style = PaintingStyle.stroke
         ..strokeWidth = 2.5;
-      for (final f in fatias) {
-        if (f.valor <= 0) continue;
-        final varredura = 2 * math.pi * (f.valor / total) * progresso;
+      for (final fatia in fatias) {
+        if (fatia.valor <= 0) continue;
+        final varredura = 2 * math.pi * (fatia.valor / total) * progresso;
         if (varredura <= 0) continue;
         final path = _fatia(
           externo,
@@ -60,7 +61,7 @@ class RoscaPainter extends CustomPainter {
           inicio,
           math.min(varredura, 2 * math.pi - 0.0001),
         );
-        canvas.drawPath(path, Paint()..color = f.cor);
+        canvas.drawPath(path, Paint()..color = fatia.cor);
         if (variasFatias) canvas.drawPath(path, separador);
         inicio += varredura;
       }
@@ -91,8 +92,8 @@ class RoscaPainter extends CustomPainter {
         ..close();
 
   @override
-  bool shouldRepaint(RoscaPainter old) =>
-      old.progresso != progresso ||
-      old.fatias != fatias ||
-      old.textoCentro != textoCentro;
+  bool shouldRepaint(RoscaPainter anterior) =>
+      anterior.progresso != progresso ||
+      anterior.fatias != fatias ||
+      anterior.textoCentro != textoCentro;
 }

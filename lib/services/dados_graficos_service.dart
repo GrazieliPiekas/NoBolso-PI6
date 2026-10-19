@@ -3,6 +3,7 @@ import '../models/lancamento.dart';
 import '../utils/formatadores.dart';
 import 'recomendacao_service.dart';
 
+/// Filtro da tela de Análise.
 enum FiltroAnalise {
   mes('Mês'),
   trimestre('Trimestre'),
@@ -12,6 +13,7 @@ enum FiltroAnalise {
   const FiltroAnalise(this.rotulo);
 }
 
+/// Tudo que a tela de Início precisa, buscado de uma vez.
 class DadosInicio {
   final Totais totais;
   final List<TotalCategoria> porCategoria;
@@ -24,7 +26,7 @@ class SerieLinha {
   final List<double> valores;
   final List<String> rotulos;
   const SerieLinha(this.valores, this.rotulos);
-  bool get vazia => valores.every((v) => v == 0);
+  bool get vazia => valores.every((valor) => valor == 0);
 }
 
 /// Matriz do mapa de calor: linhas × 7 dias da semana. `null` = célula fora do período.
@@ -33,11 +35,12 @@ class MatrizCalor {
   final List<List<double?>> valores;
   const MatrizCalor(this.rotulosLinhas, this.valores);
   double get maximo => valores
-      .expand((l) => l)
+      .expand((linha) => linha)
       .whereType<double>()
-      .fold(0.0, (m, v) => v > m ? v : m);
+      .fold(0.0, (maior, valor) => valor > maior ? valor : maior);
 }
 
+/// Tudo que a tela de Análise precisa: série da linha, mapa de calor e destaques.
 class DadosAnalise {
   final Periodo periodo;
   final SerieLinha saldo;
@@ -60,85 +63,94 @@ class DadosGraficosService {
   final LancamentoDao _dao;
   DadosGraficosService([LancamentoDao? dao]) : _dao = dao ?? LancamentoDao();
 
+  /// Monta os dados do Início para o mês informado.
   Future<DadosInicio> inicio(DateTime mes) async {
-    final p = Periodo.mes(mes);
+    final periodo = Periodo.mes(mes);
     return DadosInicio(
-      await _dao.totais(periodo: p),
-      await _dao.despesasPorCategoria(p),
+      await _dao.totais(periodo: periodo),
+      await _dao.despesasPorCategoria(periodo),
       await _dao.listar(limite: 5),
     );
   }
 
-  static Periodo periodoDoFiltro(FiltroAnalise f, DateTime hoje) =>
-      switch (f) {
+  /// Mês = mês atual; Trimestre = últimos 3 meses; Ano = últimos 12 meses.
+  static Periodo periodoDoFiltro(FiltroAnalise filtro, DateTime hoje) =>
+      switch (filtro) {
         FiltroAnalise.mes => Periodo.mes(hoje),
         FiltroAnalise.trimestre => Periodo.ultimosMeses(hoje, 3),
         FiltroAnalise.ano => Periodo.ultimosMeses(hoje, 12),
       };
 
-  Future<DadosAnalise> analise(FiltroAnalise f, {DateTime? hoje}) async {
+  /// Monta os dados da Análise. `hoje` só é passado nos testes.
+  Future<DadosAnalise> analise(FiltroAnalise filtro, {DateTime? hoje}) async {
     final agora = hoje ?? DateTime.now();
-    final p = periodoDoFiltro(f, agora);
-    final porDia = await _dao.totaisPorDia(p);
-    final porCategoria = await _dao.despesasPorCategoria(p);
+    final periodo = periodoDoFiltro(filtro, agora);
+    final porDia = await _dao.totaisPorDia(periodo);
+    final porCategoria = await _dao.despesasPorCategoria(periodo);
     return DadosAnalise(
-      p,
-      serieSaldo(f, p, porDia, agora),
-      matrizCalor(f, p, porDia),
+      periodo,
+      serieSaldo(filtro, periodo, porDia, agora),
+      matrizCalor(filtro, periodo, porDia),
       RecomendacaoService.diaMaisGasto(porDia),
       porCategoria.isEmpty ? null : porCategoria.first.nome,
-      await _dao.totais(periodo: p),
+      await _dao.totais(periodo: periodo),
     );
   }
 
   /// Saldo acumulado ao longo do período.
   /// Mês: um ponto por dia (até hoje). Trimestre: por semana. Ano: por mês.
   static SerieLinha serieSaldo(
-    FiltroAnalise f,
-    Periodo p,
+    FiltroAnalise filtro,
+    Periodo periodo,
     Map<String, (int, int)> porDia,
     DateTime hoje,
   ) {
-    final fim = hoje.isBefore(p.ate) && !hoje.isBefore(p.de)
+    final fim = hoje.isBefore(periodo.ate) && !hoje.isBefore(periodo.de)
         ? DateTime(hoje.year, hoje.month, hoje.day)
-        : p.ate;
+        : periodo.ate;
 
     // Limites (fim exclusivo) de cada balde.
     final inicios = <DateTime>[];
     final rotulos = <String>[];
-    switch (f) {
+    switch (filtro) {
       case FiltroAnalise.mes:
-        for (var d = p.de; !d.isAfter(fim); d = d.add(const Duration(days: 1))) {
-          inicios.add(d);
-          rotulos.add(d.day == 1 || d.day % 5 == 0 ? '${d.day}' : '');
+        for (
+          var dia = periodo.de;
+          !dia.isAfter(fim);
+          dia = dia.add(const Duration(days: 1))
+        ) {
+          inicios.add(dia);
+          rotulos.add(dia.day == 1 || dia.day % 5 == 0 ? '${dia.day}' : '');
         }
       case FiltroAnalise.trimestre:
-        for (var d = p.de; !d.isAfter(fim); d = d.add(const Duration(days: 7))) {
-          inicios.add(d);
-          rotulos.add(
-            d.day <= 7 ? Formatadores.mesAbreviado(d) : '',
-          );
+        for (
+          var dia = periodo.de;
+          !dia.isAfter(fim);
+          dia = dia.add(const Duration(days: 7))
+        ) {
+          inicios.add(dia);
+          rotulos.add(dia.day <= 7 ? Formatadores.mesAbreviado(dia) : '');
         }
       case FiltroAnalise.ano:
         for (
-          var d = p.de;
-          !d.isAfter(fim);
-          d = DateTime(d.year, d.month + 1, 1)
+          var dia = periodo.de;
+          !dia.isAfter(fim);
+          dia = DateTime(dia.year, dia.month + 1, 1)
         ) {
-          inicios.add(d);
-          rotulos.add(Formatadores.mesAbreviado(d));
+          inicios.add(dia);
+          rotulos.add(Formatadores.mesAbreviado(dia));
         }
     }
 
     final valores = List<double>.filled(inicios.length, 0);
-    porDia.forEach((data, v) {
-      final d = Formatadores.dataDoDb(data);
-      if (d.isAfter(fim)) return;
+    porDia.forEach((data, totaisDoDia) {
+      final dia = Formatadores.dataDoDb(data);
+      if (dia.isAfter(fim)) return;
       var i = inicios.length - 1;
-      while (i > 0 && d.isBefore(inicios[i])) {
+      while (i > 0 && dia.isBefore(inicios[i])) {
         i--;
       }
-      valores[i] += (v.$1 - v.$2) / 100;
+      valores[i] += (totaisDoDia.$1 - totaisDoDia.$2) / 100;
     });
     for (var i = 1; i < valores.length; i++) {
       valores[i] += valores[i - 1];
@@ -149,39 +161,48 @@ class DadosGraficosService {
   /// Mês: linhas = semanas do mês. Trimestre/Ano: linhas = meses.
   /// Colunas = dias da semana (segunda a domingo). Valor = despesas em reais.
   static MatrizCalor matrizCalor(
-    FiltroAnalise f,
-    Periodo p,
+    FiltroAnalise filtro,
+    Periodo periodo,
     Map<String, (int, int)> porDia,
   ) {
-    if (f == FiltroAnalise.mes) {
-      final deslocamento = p.de.weekday - 1;
-      final linhas = ((deslocamento + p.dias) / 7).ceil();
-      final m = List.generate(linhas, (_) => List<double?>.filled(7, null));
-      for (var i = 0; i < p.dias; i++) {
-        final pos = deslocamento + i;
-        m[pos ~/ 7][pos % 7] = 0;
-      }
-      porDia.forEach((data, v) {
-        final d = Formatadores.dataDoDb(data);
-        final pos = deslocamento + d.day - 1;
-        m[pos ~/ 7][pos % 7] = v.$2 / 100;
-      });
-      return MatrizCalor(
-        List.generate(linhas, (i) => 'Sem ${i + 1}'),
-        m,
+    if (filtro == FiltroAnalise.mes) {
+      final deslocamento = periodo.de.weekday - 1;
+      final linhas = ((deslocamento + periodo.dias) / 7).ceil();
+      final matriz = List.generate(
+        linhas,
+        (_) => List<double?>.filled(7, null),
       );
+      for (var i = 0; i < periodo.dias; i++) {
+        final pos = deslocamento + i;
+        matriz[pos ~/ 7][pos % 7] = 0;
+      }
+      porDia.forEach((data, totaisDoDia) {
+        final dia = Formatadores.dataDoDb(data);
+        final pos = deslocamento + dia.day - 1;
+        matriz[pos ~/ 7][pos % 7] = totaisDoDia.$2 / 100;
+      });
+      return MatrizCalor(List.generate(linhas, (i) => 'Sem ${i + 1}'), matriz);
     }
 
     final meses = <DateTime>[];
-    for (var d = p.de; !d.isAfter(p.ate); d = DateTime(d.year, d.month + 1, 1)) {
-      meses.add(d);
+    for (
+      var dia = periodo.de;
+      !dia.isAfter(periodo.ate);
+      dia = DateTime(dia.year, dia.month + 1, 1)
+    ) {
+      meses.add(dia);
     }
-    final m = List.generate(meses.length, (_) => List<double?>.filled(7, 0));
-    porDia.forEach((data, v) {
-      final d = Formatadores.dataDoDb(data);
-      final linha = (d.year - p.de.year) * 12 + d.month - p.de.month;
-      m[linha][d.weekday - 1] = m[linha][d.weekday - 1]! + v.$2 / 100;
+    final matriz = List.generate(
+      meses.length,
+      (_) => List<double?>.filled(7, 0),
+    );
+    porDia.forEach((data, totaisDoDia) {
+      final dia = Formatadores.dataDoDb(data);
+      final linha =
+          (dia.year - periodo.de.year) * 12 + dia.month - periodo.de.month;
+      matriz[linha][dia.weekday - 1] =
+          matriz[linha][dia.weekday - 1]! + totaisDoDia.$2 / 100;
     });
-    return MatrizCalor(meses.map(Formatadores.mesAbreviado).toList(), m);
+    return MatrizCalor(meses.map(Formatadores.mesAbreviado).toList(), matriz);
   }
 }

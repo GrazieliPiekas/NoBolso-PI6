@@ -2,6 +2,7 @@ import 'package:flutter/painting.dart';
 
 import '../theme/app_theme.dart';
 
+/// Ponto do texto que fica "preso" na posição informada.
 enum Ancora { centro, esquerda, direita, topoCentro, baseCentro }
 
 /// Desenha um texto com TextPainter, posicionado pela âncora escolhida.
@@ -14,25 +15,28 @@ Size desenharTexto(
   Ancora ancora = Ancora.centro,
   double anguloRad = 0,
 }) {
-  final tp = medirTexto(texto, estilo);
+  final pintorTexto = medirTexto(texto, estilo);
   final deslocamento = switch (ancora) {
-    Ancora.centro => Offset(-tp.width / 2, -tp.height / 2),
-    Ancora.esquerda => Offset(0, -tp.height / 2),
-    Ancora.direita => Offset(-tp.width, -tp.height / 2),
-    Ancora.topoCentro => Offset(-tp.width / 2, 0),
-    Ancora.baseCentro => Offset(-tp.width / 2, -tp.height),
+    Ancora.centro => Offset(-pintorTexto.width / 2, -pintorTexto.height / 2),
+    Ancora.esquerda => Offset(0, -pintorTexto.height / 2),
+    Ancora.direita => Offset(-pintorTexto.width, -pintorTexto.height / 2),
+    Ancora.topoCentro => Offset(-pintorTexto.width / 2, 0),
+    Ancora.baseCentro => Offset(-pintorTexto.width / 2, -pintorTexto.height),
   };
   if (anguloRad == 0) {
-    tp.paint(canvas, pos + deslocamento);
+    pintorTexto.paint(canvas, pos + deslocamento);
   } else {
     // Rótulo girado: save → translate → rotate → paint → restore.
     canvas.save();
     canvas.translate(pos.dx, pos.dy);
     canvas.rotate(anguloRad);
-    tp.paint(canvas, Offset(-tp.width, -tp.height / 2));
+    pintorTexto.paint(
+      canvas,
+      Offset(-pintorTexto.width, -pintorTexto.height / 2),
+    );
     canvas.restore();
   }
-  return Size(tp.width, tp.height);
+  return Size(pintorTexto.width, pintorTexto.height);
 }
 
 TextPainter medirTexto(String texto, TextStyle estilo) => TextPainter(

@@ -2,6 +2,7 @@ import 'dart:ui';
 
 import 'tipo.dart';
 
+/// Categoria de receita ou despesa (ex.: Alimentação, Salário).
 class Categoria {
   final int? id;
   final String nome;
@@ -26,13 +27,14 @@ class Categoria {
     'cor': cor,
   };
 
-  factory Categoria.fromMap(Map<String, Object?> m) => Categoria(
-    id: m['id'] as int,
-    nome: m['nome'] as String,
-    tipo: Tipo.deTexto(m['tipo'] as String),
-    cor: m['cor'] as int,
+  factory Categoria.fromMap(Map<String, Object?> mapa) => Categoria(
+    id: mapa['id'] as int,
+    nome: mapa['nome'] as String,
+    tipo: Tipo.deTexto(mapa['tipo'] as String),
+    cor: mapa['cor'] as int,
   );
 
+  /// Cria uma cópia mudando só alguns campos (o model é imutável).
   Categoria copyWith({int? id, String? nome, Tipo? tipo, int? cor}) =>
       Categoria(
         id: id ?? this.id,

@@ -1,26 +1,39 @@
 import 'package:flutter/material.dart';
 
-import '../database/categoria_dao.dart';
 import '../models/categoria.dart';
 import '../models/tipo.dart';
 import '../theme/app_theme.dart';
-import '../utils/eventos.dart';
-import '../utils/validadores.dart';
+import '../viewmodels/categoria_form_view_model.dart';
 
 /// Criar / editar categoria. Devolve a categoria salva (com id) ou null.
 class CategoriaFormDialog extends StatefulWidget {
   final Categoria? editar;
+
+  /// Tipo travado (chip "+ Nova" do formulário de lançamento).
   final Tipo? tipoFixo;
 
-  const CategoriaFormDialog({super.key, this.editar, this.tipoFixo});
+  /// Tipo já marcado, mas que pode ser trocado (aba atual de Categorias).
+  final Tipo? tipoInicial;
+
+  const CategoriaFormDialog({
+    super.key,
+    this.editar,
+    this.tipoFixo,
+    this.tipoInicial,
+  });
 
   static Future<Categoria?> abrir(
     BuildContext context, {
     Categoria? editar,
     Tipo? tipoFixo,
+    Tipo? tipoInicial,
   }) => showDialog<Categoria>(
     context: context,
-    builder: (_) => CategoriaFormDialog(editar: editar, tipoFixo: tipoFixo),
+    builder: (_) => CategoriaFormDialog(
+      editar: editar,
+      tipoFixo: tipoFixo,
+      tipoInicial: tipoInicial,
+    ),
   );
 
   @override
@@ -28,53 +41,33 @@ class CategoriaFormDialog extends StatefulWidget {
 }
 
 class _CategoriaFormDialogState extends State<CategoriaFormDialog> {
-  final _dao = CategoriaDao();
+  // ViewModel da tela (MVVM): guarda os dados e faz as ações.
+  // A tela só desenha, e o ListenableBuilder redesenha quando ele avisa.
+  late final _viewModel = CategoriaFormViewModel(
+    editar: widget.editar,
+    tipoInicial: widget.tipoFixo ?? widget.tipoInicial,
+  );
   late final _nome = TextEditingController(text: widget.editar?.nome);
-  late Tipo _tipo = widget.editar?.tipo ?? widget.tipoFixo ?? Tipo.despesa;
-  late int _cor =
-      widget.editar?.cor ?? Cores.paletaCategorias[2].toARGB32();
-  String? _erro;
-  bool _salvando = false;
 
   @override
   void dispose() {
     _nome.dispose();
+    _viewModel.dispose();
     super.dispose();
   }
 
   Future<void> _salvar() async {
-    final erro = Validadores.nomeCategoria(_nome.text);
-    if (erro != null) {
-      setState(() => _erro = erro);
-      return;
-    }
-    setState(() => _salvando = true);
-    final c = Categoria(
-      id: widget.editar?.id,
-      nome: _nome.text.trim(),
-      tipo: _tipo,
-      cor: _cor,
-    );
-    try {
-      Categoria salva;
-      if (c.id == null) {
-        salva = c.copyWith(id: await _dao.inserir(c));
-      } else {
-        await _dao.atualizar(c);
-        salva = c;
-      }
-      Eventos.notificarDados();
-      if (mounted) Navigator.pop(context, salva);
-    } catch (e) {
-      setState(() {
-        _salvando = false;
-        _erro = e.toString();
-      });
-    }
+    final salva = await _viewModel.salvar(_nome.text);
+    if (salva != null && mounted) Navigator.pop(context, salva);
   }
 
   @override
-  Widget build(BuildContext context) => AlertDialog(
+  Widget build(BuildContext context) => ListenableBuilder(
+    listenable: _viewModel,
+    builder: (context, _) => _dialogo(),
+  );
+
+  Widget _dialogo() => AlertDialog(
     title: Text(widget.editar == null ? 'Nova categoria' : 'Editar categoria'),
     content: SingleChildScrollView(
       child: Column(
@@ -86,10 +79,11 @@ class _CategoriaFormDialogState extends State<CategoriaFormDialog> {
             autofocus: true,
             maxLength: 30,
             textCapitalization: TextCapitalization.sentences,
-            decoration: InputDecoration(labelText: 'Nome', errorText: _erro),
-            onChanged: (_) {
-              if (_erro != null) setState(() => _erro = null);
-            },
+            decoration: InputDecoration(
+              labelText: 'Nome',
+              errorText: _viewModel.erro,
+            ),
+            onChanged: (_) => _viewModel.limparErro(),
           ),
           if (widget.tipoFixo == null) ...[
             const SizedBox(height: 4),
@@ -98,8 +92,9 @@ class _CategoriaFormDialogState extends State<CategoriaFormDialog> {
                 ButtonSegment(value: Tipo.despesa, label: Text('Despesa')),
                 ButtonSegment(value: Tipo.receita, label: Text('Receita')),
               ],
-              selected: {_tipo},
-              onSelectionChanged: (s) => setState(() => _tipo = s.first),
+              selected: {_viewModel.tipo},
+              onSelectionChanged: (selecao) =>
+                  _viewModel.definirTipo(selecao.first),
             ),
           ],
           const SizedBox(height: 16),
@@ -111,10 +106,10 @@ class _CategoriaFormDialogState extends State<CategoriaFormDialog> {
             children: [
               for (final cor in Cores.paletaCategorias)
                 Semantics(
-                  selected: cor.toARGB32() == _cor,
+                  selected: cor.toARGB32() == _viewModel.cor,
                   button: true,
                   child: GestureDetector(
-                    onTap: () => setState(() => _cor = cor.toARGB32()),
+                    onTap: () => _viewModel.definirCor(cor.toARGB32()),
                     child: Container(
                       width: 34,
                       height: 34,
@@ -122,14 +117,18 @@ class _CategoriaFormDialogState extends State<CategoriaFormDialog> {
                         color: cor,
                         shape: BoxShape.circle,
                         border: Border.all(
-                          color: cor.toARGB32() == _cor
+                          color: cor.toARGB32() == _viewModel.cor
                               ? Cores.texto
                               : Colors.transparent,
                           width: 3,
                         ),
                       ),
-                      child: cor.toARGB32() == _cor
-                          ? const Icon(Icons.check, color: Colors.white, size: 18)
+                      child: cor.toARGB32() == _viewModel.cor
+                          ? const Icon(
+                              Icons.check,
+                              color: Colors.white,
+                              size: 18,
+                            )
                           : null,
                     ),
                   ),
@@ -145,7 +144,7 @@ class _CategoriaFormDialogState extends State<CategoriaFormDialog> {
         child: const Text('Cancelar'),
       ),
       TextButton(
-        onPressed: _salvando ? null : _salvar,
+        onPressed: _viewModel.salvando ? null : _salvar,
         child: const Text('Salvar'),
       ),
     ],

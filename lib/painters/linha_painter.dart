@@ -1,4 +1,4 @@
-﻿import 'dart:math' as math;
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart' hide Viewport;
 
@@ -19,18 +19,18 @@ class LinhaPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final v = serie.valores;
-    if (v.isEmpty) return;
+    final valores = serie.valores;
+    if (valores.isEmpty) return;
 
     final (yMin, yMax, passo) = Viewport.eixoAgradavel(
-      v.reduce(math.min),
-      v.reduce(math.max),
+      valores.reduce(math.min),
+      valores.reduce(math.max),
     );
 
-    final vp = Viewport.comMargens(
+    final viewport = Viewport.comMargens(
       size,
       xMin: 0,
-      xMax: math.max(1, v.length - 1).toDouble(),
+      xMax: math.max(1, valores.length - 1).toDouble(),
       yMin: yMin,
       yMax: yMax,
       esquerda: 0.15,
@@ -44,20 +44,24 @@ class LinhaPainter extends CustomPainter {
       ..color = Cores.trilho
       ..strokeWidth = 1;
     for (var valor = yMin; valor <= yMax + passo / 2; valor += passo) {
-      final y = vp.yTela(valor);
-      canvas.drawLine(Offset(vp.area.left, y), Offset(vp.area.right, y), grade);
+      final y = viewport.yTela(valor);
+      canvas.drawLine(
+        Offset(viewport.area.left, y),
+        Offset(viewport.area.right, y),
+        grade,
+      );
       desenharTexto(
         canvas,
         Formatadores.moedaCurta((valor * 100).round()).replaceFirst(r'R$ ', ''),
-        Offset(vp.area.left - 6, y),
+        Offset(viewport.area.left - 6, y),
         ancora: Ancora.direita,
         estilo: const TextStyle(color: Cores.textoSuave, fontSize: 10),
       );
     }
-    if (vp.yMin < 0) {
+    if (viewport.yMin < 0) {
       canvas.drawLine(
-        Offset(vp.area.left, vp.yTela(0)),
-        Offset(vp.area.right, vp.yTela(0)),
+        Offset(viewport.area.left, viewport.yTela(0)),
+        Offset(viewport.area.right, viewport.yTela(0)),
         Paint()
           ..color = Cores.textoSuave.withValues(alpha: 0.5)
           ..strokeWidth = 1,
@@ -66,13 +70,16 @@ class LinhaPainter extends CustomPainter {
 
     // Os pontos "crescem" a partir do zero durante a animação.
     final pontos = [
-      for (var i = 0; i < v.length; i++)
-        vp.paraTela(v.length == 1 ? 0.5 : i.toDouble(), v[i] * progresso),
+      for (var i = 0; i < valores.length; i++)
+        viewport.paraTela(
+          valores.length == 1 ? 0.5 : i.toDouble(),
+          valores[i] * progresso,
+        ),
     ];
     final curva = catmullRomParaBezier(pontos);
 
     // Área sob a curva com degradê vertical.
-    final base = vp.yTela(math.max(0, vp.yMin));
+    final base = viewport.yTela(math.max(0, viewport.yMin));
     final area = Path.from(curva)
       ..lineTo(pontos.last.dx, base)
       ..lineTo(pontos.first.dx, base)
@@ -87,7 +94,7 @@ class LinhaPainter extends CustomPainter {
             Cores.verde.withValues(alpha: 0.25),
             Cores.verde.withValues(alpha: 0.02),
           ],
-        ).createShader(vp.area),
+        ).createShader(viewport.area),
     );
 
     canvas.drawPath(
@@ -129,13 +136,13 @@ class LinhaPainter extends CustomPainter {
       desenharTexto(
         canvas,
         serie.rotulos[i],
-        Offset(pontos[i].dx, vp.area.bottom + 8),
+        Offset(pontos[i].dx, viewport.area.bottom + 8),
         ancora: Ancora.topoCentro,
       );
     }
   }
 
   @override
-  bool shouldRepaint(LinhaPainter old) =>
-      old.progresso != progresso || old.serie != serie;
+  bool shouldRepaint(LinhaPainter anterior) =>
+      anterior.progresso != progresso || anterior.serie != serie;
 }

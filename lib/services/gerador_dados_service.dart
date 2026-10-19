@@ -16,9 +16,26 @@ class GeradorDadosService {
       _lancamentos = lancamentos ?? LancamentoDao();
 
   static const _descricoes = {
-    'Alimentação': ['Supermercado', 'Padaria', 'Restaurante', 'Feira', 'Lanche'],
-    'Transporte': ['Combustível', 'Ônibus', 'Aplicativo de corrida', 'Estacionamento'],
-    'Moradia': ['Aluguel', 'Conta de luz', 'Conta de água', 'Internet', 'Condomínio'],
+    'Alimentação': [
+      'Supermercado',
+      'Padaria',
+      'Restaurante',
+      'Feira',
+      'Lanche',
+    ],
+    'Transporte': [
+      'Combustível',
+      'Ônibus',
+      'Aplicativo de corrida',
+      'Estacionamento',
+    ],
+    'Moradia': [
+      'Aluguel',
+      'Conta de luz',
+      'Conta de água',
+      'Internet',
+      'Condomínio',
+    ],
     'Lazer': ['Cinema', 'Streaming', 'Show', 'Bar com amigos', 'Livro'],
     'Saúde': ['Farmácia', 'Consulta', 'Academia', 'Exame'],
     'Educação': ['Mensalidade', 'Material', 'Curso online'],

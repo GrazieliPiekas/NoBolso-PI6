@@ -46,8 +46,8 @@ class MarcaNoBolso extends StatelessWidget {
   );
 }
 
-class AberturaScreen extends StatelessWidget {
-  const AberturaScreen({super.key});
+class AberturaView extends StatelessWidget {
+  const AberturaView({super.key});
 
   @override
   Widget build(BuildContext context) => const Scaffold(
