@@ -7,6 +7,7 @@ import 'package:nobolso/database/lancamento_dao.dart';
 import 'package:nobolso/models/lancamento.dart';
 import 'package:nobolso/models/tipo.dart';
 import 'package:nobolso/viewmodels/lancamentos_view_model.dart';
+import 'package:nobolso/viewmodels/tutorial_view_model.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import 'helpers.dart';
@@ -136,4 +137,21 @@ void main() {
       vm.dispose();
     },
   );
+
+  test('tutorial: 5 passos, aparece só até ser concluído', () async {
+    expect(await TutorialViewModel.precisaMostrar(), isTrue);
+
+    final tutorial = TutorialViewModel();
+    expect(tutorial.contador, '1 de 5');
+    expect(tutorial.passoAtual.alvo, AlvoTutorial.botaoNovo);
+    for (var i = 0; i < 4; i++) {
+      expect(tutorial.avancar(), isFalse);
+    }
+    expect(tutorial.contador, '5 de 5');
+    expect(tutorial.avancar(), isTrue); // no último passo, avançar fecha
+
+    await tutorial.concluir();
+    expect(await TutorialViewModel.precisaMostrar(), isFalse);
+    tutorial.dispose();
+  });
 }

@@ -52,15 +52,13 @@ class _BoasVindasViewState extends State<BoasVindasView> {
                   const SizedBox(height: 32),
                   const MarcaNoBolso(tamanhoIcone: 110),
                   const SizedBox(height: 44),
-                  const Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      'Como podemos te chamar?',
-                      style: TextStyle(
-                        color: Cores.creme,
-                        fontSize: 20,
-                        fontWeight: FontWeight.w700,
-                      ),
+                  const Text(
+                    'Como podemos te chamar?',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Cores.creme,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
                   const SizedBox(height: 12),

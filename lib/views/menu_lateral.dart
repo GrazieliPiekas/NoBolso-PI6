@@ -9,7 +9,10 @@ import 'sobre_view.dart';
 
 /// Menu lateral (Flyout): atalhos para as telas que não estão na barra inferior.
 class MenuLateral extends StatelessWidget {
-  const MenuLateral({super.key});
+  /// Abre o tutorial de novo (quem sabe fazer isso é a navegação principal).
+  final VoidCallback? aoVerTutorial;
+
+  const MenuLateral({super.key, this.aoVerTutorial});
 
   @override
   Widget build(BuildContext context) {
@@ -87,6 +90,15 @@ class MenuLateral extends StatelessWidget {
             },
           ),
           const Divider(),
+          if (aoVerTutorial != null)
+            ListTile(
+              leading: const Icon(Icons.lightbulb_outline, color: Cores.verde),
+              title: const Text('Ver tutorial de novo'),
+              onTap: () {
+                Navigator.pop(context); // fecha o Drawer
+                aoVerTutorial!();
+              },
+            ),
           ListTile(
             leading: const Icon(Icons.info_outline, color: Cores.verde),
             title: const Text('Sobre o NoBolso'),
