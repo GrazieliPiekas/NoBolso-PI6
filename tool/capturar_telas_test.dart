@@ -22,7 +22,9 @@ import 'package:nobolso/views/boas_vindas_view.dart';
 import 'package:nobolso/views/categorias_view.dart';
 import 'package:nobolso/views/lancamento_form_view.dart';
 import 'package:nobolso/views/lancamentos_view.dart';
+import 'package:nobolso/views/inicio_view.dart';
 import 'package:nobolso/views/sobre_view.dart';
+import 'package:nobolso/views/tutorial_view.dart';
 import 'package:nobolso/services/gerador_dados_service.dart';
 import 'package:nobolso/theme/app_theme.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
@@ -62,6 +64,8 @@ void main() {
     final cfg = ConfiguracaoDao();
     await cfg.salvarNome('Grazi');
     await cfg.marcarBoasVindasVista();
+    // Sem isso o tutorial abriria por cima de todas as capturas.
+    await cfg.marcarTutorialVisto();
     await GeradorDadosService().gerar(900, semente: 7);
     final cats = await CategoriaDao().listar(tipo: Tipo.despesa);
     final dao = OrcamentoDao();
@@ -189,6 +193,20 @@ void main() {
       ),
     );
     await capturar(t, '11_sobre');
+
+    // Tutorial do primeiro acesso: passo 1 (botão +) e passo 2 (saldo).
+    await t.pumpWidget(const SizedBox());
+    await t.pumpWidget(envolver(const NavegacaoPrincipal()));
+    await t.pump(const Duration(milliseconds: 300));
+    TutorialView.mostrar(t.element(find.byType(InicioView)));
+    await capturar(t, '12_tutorial_1');
+    await t.tapAt(const Offset(200, 400));
+    await capturar(t, '13_tutorial_2');
+    for (var passo = 3; passo <= 5; passo++) {
+      await t.tapAt(const Offset(200, 400));
+      await t.pump(const Duration(milliseconds: 400));
+    }
+    await capturar(t, '14_tutorial_5');
 
     await t.pumpWidget(const SizedBox());
     await DatabaseHelper.instance.fechar();

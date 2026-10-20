@@ -4,6 +4,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'theme/app_theme.dart';
 import 'viewmodels/raiz_view_model.dart';
+import 'viewmodels/tutorial_view_model.dart';
 import 'views/abertura_view.dart';
 import 'views/analise_view.dart';
 import 'views/boas_vindas_view.dart';
@@ -12,6 +13,7 @@ import 'views/lancamento_form_view.dart';
 import 'views/menu_lateral.dart';
 import 'views/orcamentos_view.dart';
 import 'views/relatorios_view.dart';
+import 'views/tutorial_view.dart';
 
 /// Widget raiz do app: tema, idioma pt-BR e a primeira tela (RaizView).
 class NoBolsoApp extends StatelessWidget {
@@ -89,8 +91,30 @@ class _NavegacaoPrincipalState extends State<NavegacaoPrincipal> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    // Espera a primeira tela aparecer para saber onde estão os botões.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _tutorialSePrecisar());
+  }
+
+  /// No primeiro acesso, abre o tutorial depois que o Início terminou de montar.
+  Future<void> _tutorialSePrecisar() async {
+    if (!await TutorialViewModel.precisaMostrar()) return;
+    await Future.delayed(const Duration(milliseconds: 600));
+    if (mounted) TutorialView.mostrar(context);
+  }
+
+  /// Pelo menu lateral: volta para o Início (onde estão os botões explicados)
+  /// e espera o menu fechar antes de abrir o tutorial.
+  Future<void> _verTutorialDeNovo() async {
+    setState(() => _aba = 0);
+    await Future.delayed(const Duration(milliseconds: 300));
+    if (mounted) TutorialView.mostrar(context);
+  }
+
+  @override
   Widget build(BuildContext context) => Scaffold(
-    drawer: const MenuLateral(),
+    drawer: MenuLateral(aoVerTutorial: _verTutorialDeNovo),
     // Ícones claros na barra de status sobre o cabeçalho verde do Início.
     body: AnnotatedRegion(
       value: _aba == 0 ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark,
@@ -118,10 +142,18 @@ class _BarraInferior extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Widget item(int i, IconData icone, IconData iconeAtivo, String rotulo) {
+    // [chave] só é passada nas abas que o tutorial destaca.
+    Widget item(
+      int i,
+      IconData icone,
+      IconData iconeAtivo,
+      String rotulo, {
+      Key? chave,
+    }) {
       final ativo = aba == i;
       final cor = ativo ? Cores.verde : Cores.textoSuave;
       return Expanded(
+        key: chave,
         child: InkWell(
           onTap: () => aoTrocar(i),
           child: Semantics(
@@ -166,6 +198,7 @@ class _BarraInferior extends StatelessWidget {
                     label: 'Novo lançamento',
                     button: true,
                     child: Material(
+                      key: ChavesTutorial.botaoNovo,
                       color: Cores.verde,
                       shape: const CircleBorder(),
                       elevation: 3,
@@ -182,12 +215,19 @@ class _BarraInferior extends StatelessWidget {
                   ),
                 ),
               ),
-              item(2, Icons.savings_outlined, Icons.savings, 'Orçamento'),
+              item(
+                2,
+                Icons.savings_outlined,
+                Icons.savings,
+                'Orçamento',
+                chave: ChavesTutorial.abaOrcamento,
+              ),
               item(
                 3,
                 Icons.description_outlined,
                 Icons.description,
                 'Relatórios',
+                chave: ChavesTutorial.abaRelatorios,
               ),
             ],
           ),

@@ -13,6 +13,7 @@ import '../widgets/perfil_dialog.dart';
 import 'categorias_view.dart';
 import 'lancamento_form_view.dart';
 import 'lancamentos_view.dart';
+import 'tutorial_view.dart';
 
 /// Painel: saldo do mês, rosca (receitas × despesas), barras (gastos por categoria)
 /// e últimos lançamentos.
@@ -227,7 +228,7 @@ class _Cabecalho extends StatelessWidget {
           children: [
             Row(
               children: [
-                const BotaoMenu(cor: Colors.white),
+                BotaoMenu(key: ChavesTutorial.menu, cor: Colors.white),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -289,20 +290,32 @@ class _Cabecalho extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const SizedBox(height: 24),
-                  const Text(
-                    'Saldo do mês',
-                    style: TextStyle(color: Color(0xFFC9D6C3), fontSize: 15),
-                  ),
-                  FittedBox(
-                    fit: BoxFit.scaleDown,
-                    child: Text(
-                      totais == null ? '...' : Formatadores.moeda(totais.saldo),
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 40,
-                        fontWeight: FontWeight.w800,
+                  // Rótulo + valor juntos: é esse bloco que o tutorial destaca.
+                  Column(
+                    key: ChavesTutorial.saldo,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Saldo do mês',
+                        style: TextStyle(
+                          color: Color(0xFFC9D6C3),
+                          fontSize: 15,
+                        ),
                       ),
-                    ),
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          totais == null
+                              ? '...'
+                              : Formatadores.moeda(totais.saldo),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 40,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 14),
                   Row(

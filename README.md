@@ -15,6 +15,8 @@ Equipe: Erick, Grazieli e Gustavo.
 - Cria orçamentos por mês, no total ou por categoria, e avisa ao chegar em 50%, 80% e 100%.
 - Mostra 5 gráficos desenhados por nós, sem biblioteca: barras, linha, rosca, medidor e mapa de calor.
 - Dá dicas automáticas com base nos gastos.
+- No primeiro acesso, mostra um tutorial rápido de 5 passos: escurece a tela, destaca um botão
+  e explica numa frase. Dá para pular, e para rever pelo menu lateral.
 - Exporta relatório em PDF, Excel (.xlsx) e CSV.
 
 ## Como rodar
@@ -146,5 +148,8 @@ Algumas escolhas:
 - Se o gasto pular direto de 40% para 100%, só o aviso de 100% é enviado.
 - Mudar o limite de um orçamento libera os avisos dele de novo.
 - A fonte Roboto vai junto com o app para o PDF aceitar acentos.
+- O tutorial foi feito sem biblioteca: o escurecido com o "buraco" em volta do botão é um
+  `CustomPainter` (`views/tutorial_view.dart`). Que o tutorial já foi visto fica salvo na
+  tabela `configuracoes`.
 - No modo debug, o diálogo de perfil tem botões para gerar 100, 1.000 ou 10.000 lançamentos
   de teste.

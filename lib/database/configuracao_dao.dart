@@ -10,6 +10,7 @@ class ConfiguracaoDao {
 
   static const chaveNome = 'nome_usuario';
   static const chaveBoasVindas = 'boas_vindas_vista';
+  static const chaveTutorial = 'tutorial_visto';
 
   /// Lê um valor da tabela chave/valor `configuracoes` (null se não existir).
   Future<String?> ler(String chave) async {
@@ -41,4 +42,9 @@ class ConfiguracaoDao {
   Future<bool> boasVindasVista() async => (await ler(chaveBoasVindas)) == '1';
 
   Future<void> marcarBoasVindasVista() => gravar(chaveBoasVindas, '1');
+
+  /// true depois que a pessoa terminou (ou pulou) o tutorial do primeiro acesso.
+  Future<bool> tutorialVisto() async => (await ler(chaveTutorial)) == '1';
+
+  Future<void> marcarTutorialVisto() => gravar(chaveTutorial, '1');
 }
