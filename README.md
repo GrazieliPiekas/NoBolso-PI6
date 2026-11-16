@@ -18,6 +18,9 @@ Equipe: Erick, Grazieli e Gustavo.
 - No primeiro acesso, mostra um tutorial rápido de 5 passos: escurece a tela, destaca um botão
   e explica numa frase. Dá para pular, e para rever pelo menu lateral.
 - Exporta relatório em PDF, Excel (.xlsx) e CSV.
+- Faz backup dos dados num arquivo e restaura a partir dele (menu > Backup dos dados).
+- Copia os lançamentos fixos do mês anterior com um toque (tela Lançamentos).
+- Deixa desfazer a exclusão de um lançamento pelo botão "Desfazer" do aviso.
 
 ## Como rodar
 
@@ -151,5 +154,13 @@ Algumas escolhas:
 - O tutorial foi feito sem biblioteca: o escurecido com o "buraco" em volta do botão é um
   `CustomPainter` (`views/tutorial_view.dart`). Que o tutorial já foi visto fica salvo na
   tabela `configuracoes`.
+- Se uma tela não conseguir carregar os dados, ela mostra "Algo deu errado" com o botão
+  "Tentar de novo", em vez de ficar carregando para sempre (`viewmodels/carregamento_seguro.dart`).
+- O backup é uma cópia do próprio `nobolso.db`, que a pessoa guarda onde quiser pelo
+  compartilhar do sistema. O app não envia nada. Antes de restaurar, ele confere se o arquivo é
+  um banco do NoBolso, de uma versão igual ou anterior; se não for, os dados atuais ficam intactos
+  (`services/backup_service.dart`).
+- "Copiar fixos" mantém o mesmo dia (31 vira o último dia do mês) e não duplica: um fixo com a
+  mesma descrição, categoria e tipo que já esteja no mês é pulado (`services/lancamentos_fixos_service.dart`).
 - No modo debug, o diálogo de perfil tem botões para gerar 100, 1.000 ou 10.000 lançamentos
   de teste.

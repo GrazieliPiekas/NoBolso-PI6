@@ -4,9 +4,10 @@ import '../database/categoria_dao.dart';
 import '../models/categoria.dart';
 import '../models/tipo.dart';
 import '../utils/eventos.dart';
+import 'carregamento_seguro.dart';
 
 /// CRUD de categorias (RF02) com busca por nome em tempo real.
-class CategoriasViewModel extends ChangeNotifier {
+class CategoriasViewModel extends ChangeNotifier with CarregamentoSeguro {
   final _dao = CategoriaDao();
 
   List<Categoria>? categorias;
@@ -29,10 +30,9 @@ class CategoriasViewModel extends ChangeNotifier {
   }
 
   /// Lê todas as categorias do banco e avisa a View.
-  Future<void> carregar() async {
+  Future<void> carregar() => carregarComSeguranca(() async {
     categorias = await _dao.listar();
-    notifyListeners();
-  }
+  });
 
   /// Chamado a cada letra digitada na busca. Não vai no banco, só filtra a lista.
   void buscar(String texto) {

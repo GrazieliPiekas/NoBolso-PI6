@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
 import '../viewmodels/perfil_view_model.dart';
+import 'componentes.dart';
 
 /// Perfil local: só o nome, guardado no SQLite. Em modo debug mostra o gerador
 /// de lançamentos fictícios para testes de desempenho e com participantes.
@@ -53,12 +54,13 @@ class _PerfilDialogState extends State<PerfilDialog> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          TextField(
-            controller: _nome,
-            maxLength: 30,
-            textCapitalization: TextCapitalization.words,
-            decoration: const InputDecoration(
-              labelText: 'Como podemos te chamar?',
+          RotuloCampo(
+            rotulo: 'Como podemos te chamar?',
+            child: TextField(
+              controller: _nome,
+              maxLength: 30,
+              textCapitalization: TextCapitalization.words,
+              decoration: const InputDecoration(hintText: 'Seu nome'),
             ),
           ),
           const Row(

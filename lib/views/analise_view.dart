@@ -71,7 +71,7 @@ class _AnaliseViewState extends State<AnaliseView> {
           ),
         ),
         if (dados == null)
-          const Carregando()
+          Carregando(erro: _viewModel.erro, onTentarDeNovo: _viewModel.carregar)
         else if (dados.totais.quantidade == 0)
           const CartaoSecao(
             child: EstadoVazio(

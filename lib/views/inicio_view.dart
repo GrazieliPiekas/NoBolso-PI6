@@ -53,7 +53,10 @@ class _InicioViewState extends State<InicioView> {
           _Cabecalho(nome: _viewModel.nome, dados: dados),
           const SizedBox(height: 18),
           if (dados == null)
-            const Carregando()
+            Carregando(
+              erro: _viewModel.erro,
+              onTentarDeNovo: _viewModel.carregar,
+            )
           else ...[
             _cartaoRosca(dados),
             _cartaoBarras(dados),

@@ -12,21 +12,24 @@ class DatabaseHelper {
   static const _nomeArquivo = 'nobolso.db';
 
   /// v2: coluna booleana `fixo` em lançamentos.
-  static const _versao = 2;
+  static const versao = 2;
 
-  /// Nos testes recebe `inMemoryDatabasePath`.
+  /// Nos testes recebe `inMemoryDatabasePath` (ou um arquivo temporário).
   String? caminhoPersonalizado;
 
   Database? _db;
 
   Future<Database> get database async => _db ??= await _abrir();
 
+  /// Onde o arquivo do banco fica no aparelho (usado no backup).
+  Future<String> caminhoArquivo() async =>
+      caminhoPersonalizado ?? join(await getDatabasesPath(), _nomeArquivo);
+
   Future<Database> _abrir() async {
-    final caminho =
-        caminhoPersonalizado ?? join(await getDatabasesPath(), _nomeArquivo);
+    final caminho = await caminhoArquivo();
     return openDatabase(
       caminho,
-      version: _versao,
+      version: versao,
       onConfigure: (db) => db.execute('PRAGMA foreign_keys = ON'),
       onCreate: _criar,
       onUpgrade: _atualizar,

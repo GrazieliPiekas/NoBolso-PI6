@@ -54,7 +54,7 @@ class _OrcamentosViewState extends State<OrcamentosView> {
         ),
         const SizedBox(height: 16),
         if (resumo == null)
-          const Carregando()
+          Carregando(erro: _viewModel.erro, onTentarDeNovo: _viewModel.carregar)
         else if (resumo.vazio)
           CartaoSecao(
             child: EstadoVazio(

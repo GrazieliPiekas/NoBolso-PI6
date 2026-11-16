@@ -128,17 +128,19 @@ class _OrcamentoFormSheetState extends State<OrcamentoFormSheet> {
               _escolhaCategoria(),
             ],
             const SizedBox(height: 14),
-            TextField(
-              controller: _limite,
-              autofocus: !_viewModel.edicao,
-              keyboardType: TextInputType.number,
-              inputFormatters: [MoedaInputFormatter()],
-              decoration: InputDecoration(
-                labelText: 'Limite por mês',
-                prefixText: r'R$ ',
-                errorText: _viewModel.erro,
+            RotuloCampo(
+              rotulo: 'Limite por mês',
+              child: TextField(
+                controller: _limite,
+                autofocus: !_viewModel.edicao,
+                keyboardType: TextInputType.number,
+                inputFormatters: [MoedaInputFormatter()],
+                decoration: InputDecoration(
+                  prefixText: r'R$ ',
+                  errorText: _viewModel.erro,
+                ),
+                onChanged: (_) => _viewModel.limparErro(),
               ),
-              onChanged: (_) => _viewModel.limparErro(),
             ),
             const SizedBox(height: 18),
             FilledButton(
@@ -198,29 +200,32 @@ class _OrcamentoFormSheetState extends State<OrcamentoFormSheet> {
     ),
   );
 
-  Widget _escolhaCategoria() => DropdownButtonFormField<int>(
-    // A key recria o campo quando a lista chega do banco.
-    key: ValueKey(_viewModel.opcoes.length),
-    initialValue:
-        _viewModel.opcoes.any(
-          (categoria) => categoria.id == _viewModel.categoriaId,
-        )
-        ? _viewModel.categoriaId
-        : null,
-    decoration: const InputDecoration(labelText: 'Categoria'),
-    items: [
-      for (final categoria in _viewModel.opcoes)
-        DropdownMenuItem(
-          value: categoria.id,
-          child: Row(
-            children: [
-              Bolinha(categoria.color),
-              const SizedBox(width: 8),
-              Text(categoria.nome),
-            ],
+  Widget _escolhaCategoria() => RotuloCampo(
+    rotulo: 'Categoria',
+    child: DropdownButtonFormField<int>(
+      // A key recria o campo quando a lista chega do banco.
+      key: ValueKey(_viewModel.opcoes.length),
+      initialValue:
+          _viewModel.opcoes.any(
+            (categoria) => categoria.id == _viewModel.categoriaId,
+          )
+          ? _viewModel.categoriaId
+          : null,
+      decoration: const InputDecoration(),
+      items: [
+        for (final categoria in _viewModel.opcoes)
+          DropdownMenuItem(
+            value: categoria.id,
+            child: Row(
+              children: [
+                Bolinha(categoria.color),
+                const SizedBox(width: 8),
+                Text(categoria.nome),
+              ],
+            ),
           ),
-        ),
-    ],
-    onChanged: _viewModel.edicao ? null : _viewModel.definirCategoria,
+      ],
+      onChanged: _viewModel.edicao ? null : _viewModel.definirCategoria,
+    ),
   );
 }

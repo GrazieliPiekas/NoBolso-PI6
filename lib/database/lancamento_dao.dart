@@ -44,7 +44,7 @@ class LancamentoDao {
     return db.insert('lancamentos', lancamento.toMap()..remove('id'));
   }
 
-  /// Inserção em lote numa única transação (gerador de dados de teste).
+  /// Salva vários lançamentos de uma vez só (usado pelo gerador de dados de teste).
   Future<void> inserirVarios(List<Lancamento> itens) async {
     final db = await _helper.database;
     await db.transaction((transacao) async {
@@ -69,6 +69,17 @@ class LancamentoDao {
   Future<void> excluir(int id) async {
     final db = await _helper.database;
     await db.delete('lancamentos', where: 'id = ?', whereArgs: [id]);
+  }
+
+  /// Coloca de volta um lançamento excluído, com o mesmo id (botão "Desfazer").
+  /// Assim ele volta exatamente para a mesma posição na lista.
+  Future<void> restaurar(Lancamento lancamento) async {
+    final db = await _helper.database;
+    await db.insert(
+      'lancamentos',
+      lancamento.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
   }
 
   /// Apaga todos os lançamentos (só usado pelo botão de teste do modo debug).

@@ -4,6 +4,7 @@ import '../models/categoria.dart';
 import '../models/tipo.dart';
 import '../theme/app_theme.dart';
 import '../viewmodels/categoria_form_view_model.dart';
+import '../widgets/componentes.dart';
 
 /// Criar / editar categoria. Devolve a categoria salva (com id) ou null.
 class CategoriaFormDialog extends StatefulWidget {
@@ -74,16 +75,16 @@ class _CategoriaFormDialogState extends State<CategoriaFormDialog> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          TextField(
-            controller: _nome,
-            autofocus: true,
-            maxLength: 30,
-            textCapitalization: TextCapitalization.sentences,
-            decoration: InputDecoration(
-              labelText: 'Nome',
-              errorText: _viewModel.erro,
+          RotuloCampo(
+            rotulo: 'Nome',
+            child: TextField(
+              controller: _nome,
+              autofocus: true,
+              maxLength: 30,
+              textCapitalization: TextCapitalization.sentences,
+              decoration: InputDecoration(errorText: _viewModel.erro),
+              onChanged: (_) => _viewModel.limparErro(),
             ),
-            onChanged: (_) => _viewModel.limparErro(),
           ),
           if (widget.tipoFixo == null) ...[
             const SizedBox(height: 4),
