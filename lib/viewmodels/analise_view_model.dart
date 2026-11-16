@@ -2,9 +2,10 @@ import 'package:flutter/foundation.dart';
 
 import '../services/dados_graficos_service.dart';
 import '../utils/eventos.dart';
+import 'carregamento_seguro.dart';
 
 /// Estado da Análise: filtro Mês/Trimestre/Ano e dados da linha e do mapa de calor.
-class AnaliseViewModel extends ChangeNotifier {
+class AnaliseViewModel extends ChangeNotifier with CarregamentoSeguro {
   final _servico = DadosGraficosService();
 
   FiltroAnalise filtro = FiltroAnalise.mes;
@@ -19,11 +20,10 @@ class AnaliseViewModel extends ChangeNotifier {
   }
 
   /// Busca os dados do filtro atual e avisa a View (notifyListeners) para redesenhar.
-  Future<void> carregar() async {
+  Future<void> carregar() => carregarComSeguranca(() async {
     dados = await _servico.analise(filtro);
     versao++;
-    notifyListeners();
-  }
+  });
 
   /// Troca Mês/Trimestre/Ano e recarrega.
   void mudarFiltro(FiltroAnalise novoFiltro) {

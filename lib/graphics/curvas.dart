@@ -2,86 +2,78 @@ import 'dart:ui';
 
 import 'package:flutter/animation.dart';
 
-/// Converte uma sequência de pontos numa curva suave que passa por todos eles.
+/// Pontos de controle da curva entre cada par de pontos vizinhos.
 ///
-/// Cada trecho Pi → Pi+1 da spline Catmull-Rom vira uma Bézier cúbica com controles:
+/// Para ir do ponto Pi até o Pi+1 usamos uma curva de Bézier cúbica.
+/// Os dois pontos de controle saem da fórmula de Catmull-Rom:
 ///   C1 = Pi   + (Pi+1 − Pi−1) / 6
 ///   C2 = Pi+1 − (Pi+2 − Pi)   / 6
-/// Nas pontas, o ponto inexistente é repetido (P−1 = P0, Pn+1 = Pn).
+/// No primeiro e no último trecho falta um vizinho, então repetimos a ponta.
+List<(Offset, Offset)> controlesCatmullRom(List<Offset> pts) {
+  final controles = <(Offset, Offset)>[];
+  for (var i = 0; i < pts.length - 1; i++) {
+    final anterior = pts[i == 0 ? 0 : i - 1];
+    final atual = pts[i];
+    final proximo = pts[i + 1];
+    final depois = pts[i + 2 < pts.length ? i + 2 : pts.length - 1];
+    final c1 = atual + (proximo - anterior) / 6;
+    final c2 = proximo - (depois - atual) / 6;
+    controles.add((c1, c2));
+  }
+  return controles;
+}
+
+/// Monta uma linha suave que passa por todos os pontos (gráfico de linha).
 Path catmullRomParaBezier(List<Offset> pts) {
   final path = Path();
   if (pts.isEmpty) return path;
   path.moveTo(pts.first.dx, pts.first.dy);
-  if (pts.length == 1) return path;
-  for (var i = 0; i < pts.length - 1; i++) {
-    final p0 = pts[i == 0 ? 0 : i - 1];
-    final p1 = pts[i];
-    final p2 = pts[i + 1];
-    final p3 = pts[i + 2 < pts.length ? i + 2 : pts.length - 1];
-    final c1 = p1 + (p2 - p0) / 6;
-    final c2 = p2 - (p3 - p1) / 6;
-    path.cubicTo(c1.dx, c1.dy, c2.dx, c2.dy, p2.dx, p2.dy);
+  final controles = controlesCatmullRom(pts);
+  for (var i = 0; i < controles.length; i++) {
+    final (c1, c2) = controles[i];
+    final destino = pts[i + 1];
+    path.cubicTo(c1.dx, c1.dy, c2.dx, c2.dy, destino.dx, destino.dy);
   }
   return path;
 }
 
-/// Pontos de controle de cada trecho (útil para testes e para depuração).
-List<(Offset, Offset)> controlesCatmullRom(List<Offset> pts) => [
-  for (var i = 0; i < pts.length - 1; i++)
-    (
-      pts[i] + (pts[i + 1] - pts[i == 0 ? 0 : i - 1]) / 6,
-      pts[i + 1] -
-          (pts[i + 2 < pts.length ? i + 2 : pts.length - 1] - pts[i]) / 6,
-    ),
-];
-
-/// Easing por Bézier cúbica com P0 = (0,0) e P3 = (1,1), como o `cubic-bezier` do CSS.
+/// Curva de velocidade das animações dos gráficos (começa rápido e freia no fim).
 ///
-/// B(t) = 3(1−t)²t·P1 + 3(1−t)t²·P2 + t³
-/// Para um progresso x, encontra t com Bx(t) = x (Newton-Raphson, com bisseção
-/// como reserva) e devolve By(t).
+/// É uma Bézier cúbica que vai de (0,0) até (1,1), igual ao `cubic-bezier` do CSS:
+///   B(t) = 3(1−t)²t·P1 + 3(1−t)t²·P2 + t³
+/// O Flutter manda o tempo da animação (x) e quer de volta o quanto ela andou (y).
+/// Para isso achamos o t que dá esse x e calculamos o y nesse mesmo t.
 class EasingBezier extends Curve {
   final double x1, y1, x2, y2;
 
   const EasingBezier(this.x1, this.y1, this.x2, this.y2);
 
-  /// Saída suave, usada nas transições dos gráficos.
+  /// Curva usada nos gráficos do app.
   static const suave = EasingBezier(0.22, 1.0, 0.36, 1.0);
 
-  static double _bezier(double t, double a, double b) {
+  /// Valor da Bézier no ponto t (serve tanto para o x quanto para o y).
+  static double _bezier(double t, double p1, double p2) {
     final u = 1 - t;
-    return 3 * u * u * t * a + 3 * u * t * t * b + t * t * t;
+    return 3 * u * u * t * p1 + 3 * u * t * t * p2 + t * t * t;
   }
 
-  static double _derivada(double t, double a, double b) {
-    final u = 1 - t;
-    return 3 * u * u * a + 6 * u * t * (b - a) + 3 * t * t * (1 - b);
-  }
-
-  double _resolverT(double x) {
+  /// Acha o t em que a curva chega no x pedido, dividindo o intervalo
+  /// ao meio várias vezes (busca binária). 30 vezes já dá bastante precisão.
+  double _acharT(double x) {
+    var baixo = 0.0;
+    var alto = 1.0;
     var t = x;
-    for (var i = 0; i < 8; i++) {
-      final erro = _bezier(t, x1, x2) - x;
-      if (erro.abs() < 1e-6) return t;
-      final inclinacao = _derivada(t, x1, x2);
-      if (inclinacao.abs() < 1e-6) break;
-      t -= erro / inclinacao;
-    }
-    var baixo = 0.0, alto = 1.0;
-    t = x;
     for (var i = 0; i < 30; i++) {
-      final xCalculado = _bezier(t, x1, x2);
-      if ((xCalculado - x).abs() < 1e-6) break;
-      if (xCalculado < x) {
+      t = (baixo + alto) / 2;
+      if (_bezier(t, x1, x2) < x) {
         baixo = t;
       } else {
         alto = t;
       }
-      t = (baixo + alto) / 2;
     }
     return t;
   }
 
   @override
-  double transformInternal(double t) => _bezier(_resolverT(t), y1, y2);
+  double transformInternal(double t) => _bezier(_acharT(t), y1, y2);
 }

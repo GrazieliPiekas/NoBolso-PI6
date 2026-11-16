@@ -124,8 +124,20 @@ class _LancamentoFormViewState extends State<LancamentoFormView> {
     if (confirmou != true) return;
     await _viewModel.excluir();
     if (!mounted) return;
+    // O aviso fica no ScaffoldMessenger do app, então continua na tela depois
+    // que o formulário fecha. "Desfazer" devolve o lançamento original.
+    final excluido = _viewModel.editar!;
     ScaffoldMessenger.of(context)
-        .showSnackBar(const SnackBar(content: Text('Lançamento excluído')));
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: const Text('Lançamento excluído'),
+          action: SnackBarAction(
+            label: 'Desfazer',
+            onPressed: () => LancamentoFormViewModel.desfazerExclusao(excluido),
+          ),
+        ),
+      );
     Navigator.pop(context);
   }
 
@@ -286,14 +298,16 @@ class _LancamentoFormViewState extends State<LancamentoFormView> {
                     onTap: _escolherData,
                   ),
                   const SizedBox(height: 12),
-                  TextField(
-                    controller: _descricao,
-                    maxLength: 80,
-                    textCapitalization: TextCapitalization.sentences,
-                    decoration: const InputDecoration(
-                      labelText: 'Descrição (opcional)',
-                      hintText: 'Ex.: Supermercado São José',
-                      contentPadding: EdgeInsets.fromLTRB(20, 18, 20, 18),
+                  RotuloCampo(
+                    rotulo: 'Descrição (opcional)',
+                    child: TextField(
+                      controller: _descricao,
+                      maxLength: 80,
+                      textCapitalization: TextCapitalization.sentences,
+                      decoration: const InputDecoration(
+                        hintText: 'Ex.: Supermercado São José',
+                        contentPadding: EdgeInsets.fromLTRB(20, 18, 20, 18),
+                      ),
                     ),
                   ),
                   // Opcional e desmarcado por padrão: não alonga o fluxo (RF12).

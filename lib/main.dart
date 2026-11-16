@@ -12,7 +12,7 @@ import 'services/notificacao_service.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // No Windows (usado só para desenvolver) o SQLite roda via FFI.
+  // No Windows (usado só para desenvolver) o SQLite precisa do pacote sqflite_common_ffi.
   if (!kIsWeb && (Platform.isWindows || Platform.isLinux || Platform.isMacOS)) {
     sqfliteFfiInit();
     databaseFactory = databaseFactoryFfi;

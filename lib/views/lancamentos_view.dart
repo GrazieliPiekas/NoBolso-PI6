@@ -54,9 +54,57 @@ class _LancamentosViewState extends State<LancamentosView> {
     return confirmou == true;
   }
 
+  /// Pergunta antes e copia os fixos do mês anterior para o mês da tela.
+  Future<void> _copiarFixos() async {
+    final de = Formatadores.mesAno(_viewModel.mesAnterior).toLowerCase();
+    final para = Formatadores.mesAno(_viewModel.mes).toLowerCase();
+    final confirmou = await showDialog<bool>(
+      context: context,
+      builder: (contextoDialogo) => AlertDialog(
+        title: const Text('Copiar lançamentos fixos?'),
+        content: Text(
+          'Os lançamentos marcados como fixos em $de serão copiados para '
+          '$para, no mesmo dia. Os que já estiverem em $para não são repetidos.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(contextoDialogo, false),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(contextoDialogo, true),
+            child: const Text('Copiar'),
+          ),
+        ],
+      ),
+    );
+    if (confirmou != true || !mounted) return;
+    final mensageiro = ScaffoldMessenger.of(context);
+    String mensagem;
+    try {
+      final copiados = await _viewModel.copiarFixosDoMesAnterior();
+      mensagem = copiados == 0
+          ? 'Nenhum lançamento fixo novo para copiar de $de.'
+          : '$copiados lançamento${copiados == 1 ? '' : 's'} '
+                'fixo${copiados == 1 ? '' : 's'} copiado${copiados == 1 ? '' : 's'}.';
+    } catch (erro) {
+      mensagem = 'Não foi possível copiar: $erro';
+    }
+    mensageiro.showSnackBar(SnackBar(content: Text(mensagem)));
+  }
+
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Lançamentos')),
+    appBar: AppBar(
+      title: const Text('Lançamentos'),
+      actions: [
+        IconButton(
+          tooltip: 'Copiar fixos do mês anterior',
+          onPressed: _copiarFixos,
+          icon: const Icon(Icons.event_repeat),
+        ),
+      ],
+    ),
     body: ListenableBuilder(
       listenable: _viewModel,
       builder: (context, _) => Column(
@@ -210,14 +258,36 @@ class _LancamentosViewState extends State<LancamentosView> {
 
   Widget _lista() {
     final itens = _viewModel.itens;
-    if (itens == null) return const Carregando();
+    if (itens == null) {
+      return Carregando(
+        erro: _viewModel.erro,
+        onTentarDeNovo: _viewModel.carregar,
+      );
+    }
     if (itens.isEmpty) {
-      return EstadoVazio(
-        icone: Icons.search_off,
-        titulo: 'Nenhum lançamento',
-        mensagem: _viewModel.busca.isNotEmpty
-            ? 'Nada encontrado para "${_viewModel.busca}" neste mês.'
-            : 'Não há lançamentos com esses filtros neste mês.',
+      final semFiltros =
+          _viewModel.busca.isEmpty &&
+          _viewModel.tipo == null &&
+          _viewModel.categoriaId == null &&
+          !_viewModel.somenteFixos;
+      return ListView(
+        children: [
+          EstadoVazio(
+            icone: Icons.search_off,
+            titulo: 'Nenhum lançamento',
+            mensagem: _viewModel.busca.isNotEmpty
+                ? 'Nada encontrado para "${_viewModel.busca}" neste mês.'
+                : 'Não há lançamentos com esses filtros neste mês.',
+            // Mês novo e vazio: atalho para trazer as contas fixas.
+            acao: semFiltros
+                ? OutlinedButton.icon(
+                    onPressed: _copiarFixos,
+                    icon: const Icon(Icons.event_repeat),
+                    label: const Text('Copiar fixos do mês anterior'),
+                  )
+                : null,
+          ),
+        ],
       );
     }
     return ListView.builder(
@@ -230,12 +300,19 @@ class _LancamentosViewState extends State<LancamentosView> {
           direction: DismissDirection.endToStart,
           confirmDismiss: (_) => _confirmarExclusao(lancamento),
           onDismissed: (_) async {
+            final mensageiro = ScaffoldMessenger.of(context);
             await _viewModel.excluir(lancamento);
-            if (context.mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Lançamento excluído')),
+            mensageiro
+              ..hideCurrentSnackBar()
+              ..showSnackBar(
+                SnackBar(
+                  content: const Text('Lançamento excluído'),
+                  action: SnackBarAction(
+                    label: 'Desfazer',
+                    onPressed: () => _viewModel.desfazerExclusao(lancamento),
+                  ),
+                ),
               );
-            }
           },
           background: Container(
             alignment: Alignment.centerRight,

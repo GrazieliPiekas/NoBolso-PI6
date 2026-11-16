@@ -5,13 +5,17 @@ import '../database/lancamento_dao.dart';
 import '../models/categoria.dart';
 import '../models/lancamento.dart';
 import '../models/tipo.dart';
+import '../services/lancamentos_fixos_service.dart';
+import '../services/orcamento_service.dart';
 import '../utils/eventos.dart';
 import '../utils/formatadores.dart';
+import 'carregamento_seguro.dart';
 
 /// Lista de lançamentos do mês com filtros de tipo, categoria, "só fixos"
 /// e busca por texto em tempo real.
-class LancamentosViewModel extends ChangeNotifier {
-  final _dao = LancamentoDao();
+class LancamentosViewModel extends ChangeNotifier with CarregamentoSeguro {
+  final LancamentoDao _dao;
+  final CategoriaDao _categoriasDao;
 
   DateTime mes = DateTime.now();
   Tipo? tipo;
@@ -24,14 +28,16 @@ class LancamentosViewModel extends ChangeNotifier {
   List<Lancamento>? _doMes;
 
   /// Carrega as categorias (para o filtro) e os lançamentos do mês atual.
-  LancamentosViewModel() {
+  /// Os DAOs podem ser trocados nos testes; no app usam o banco padrão.
+  LancamentosViewModel({LancamentoDao? dao, CategoriaDao? categoriasDao})
+    : _dao = dao ?? LancamentoDao(),
+      _categoriasDao = categoriasDao ?? CategoriaDao() {
     Eventos.dadosAlterados.addListener(carregar);
-    CategoriaDao().listar().then((lista) {
-      categorias = lista;
-      notifyListeners();
-    });
     carregar();
   }
+
+  /// Mês anterior ao que está na tela (de onde os fixos são copiados).
+  DateTime get mesAnterior => DateTime(mes.year, mes.month - 1, 1);
 
   /// Categorias que fazem sentido para o tipo escolhido.
   List<Categoria> get categoriasDoTipo => categorias
@@ -72,14 +78,15 @@ class LancamentosViewModel extends ChangeNotifier {
 
   /// Busca no banco os lançamentos do mês com os filtros de tipo e categoria.
   /// A busca por texto e o "só fixos" são aplicados depois, em [itens].
-  Future<void> carregar() async {
+  /// As categorias (do filtro) vêm junto, para ficarem em dia se forem editadas.
+  Future<void> carregar() => carregarComSeguranca(() async {
+    categorias = await _categoriasDao.listar();
     _doMes = await _dao.listar(
       periodo: Periodo.mes(mes),
       tipo: tipo,
       categoriaId: categoriaId,
     );
-    notifyListeners();
-  }
+  });
 
   /// delta = -1 vai pro mês anterior, +1 vai pro próximo.
   void mudarMes(int delta) {
@@ -103,7 +110,7 @@ class LancamentosViewModel extends ChangeNotifier {
   }
 
   /// Chamado a cada letra digitada. Só guarda o texto e redesenha:
-  /// o filtro de verdade acontece no getter [itens].
+  /// o filtro de verdade acontece em [itens].
   void buscar(String texto) {
     busca = texto;
     notifyListeners();
@@ -120,6 +127,25 @@ class LancamentosViewModel extends ChangeNotifier {
     notifyListeners();
     await _dao.excluir(lancamento.id!);
     Eventos.notificarDados();
+  }
+
+  /// Botão "Desfazer" do aviso de exclusão: devolve o lançamento ao banco
+  /// com o mesmo id, e todas as telas recarregam.
+  Future<void> desfazerExclusao(Lancamento lancamento) async {
+    await _dao.restaurar(lancamento);
+    Eventos.notificarDados();
+  }
+
+  /// Copia os lançamentos fixos do mês anterior para o mês da tela.
+  /// Devolve quantos foram criados (0 se não havia nada novo para copiar).
+  Future<int> copiarFixosDoMesAnterior() async {
+    final copiados = await LancamentosFixosService(_dao)
+        .copiarDoMesAnterior(mes);
+    if (copiados > 0) {
+      await OrcamentoService(lancamentos: _dao).verificarAlertas();
+      Eventos.notificarDados();
+    }
+    return copiados;
   }
 
   /// Ignora maiúsculas e acentos: "saude" encontra "Saúde".

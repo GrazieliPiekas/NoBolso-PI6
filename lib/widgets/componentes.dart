@@ -254,14 +254,66 @@ class BarraProgresso extends StatelessWidget {
   );
 }
 
-/// Indicador de carregamento padrão (RF10).
-class Carregando extends StatelessWidget {
-  const Carregando({super.key});
+/// Rótulo pequeno em cima de um campo de formulário.
+/// Usado no lugar do `labelText`: nos campos preenchidos e arredondados do app,
+/// o rótulo flutuante ficava em cima da borda, cortado pela metade.
+class RotuloCampo extends StatelessWidget {
+  final String rotulo;
+  final Widget child;
+
+  const RotuloCampo({super.key, required this.rotulo, required this.child});
+
   @override
-  Widget build(BuildContext context) => const Padding(
-    padding: EdgeInsets.all(32),
-    child: Center(child: CircularProgressIndicator(color: Cores.verde)),
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Padding(
+        padding: const EdgeInsets.only(left: 4, bottom: 6),
+        child: Text(
+          rotulo,
+          style: const TextStyle(
+            color: Cores.textoSuave,
+            fontWeight: FontWeight.w700,
+            fontSize: 13,
+          ),
+        ),
+      ),
+      child,
+    ],
   );
+}
+
+/// Indicador de carregamento padrão (RF10).
+/// Se o carregamento falhou ([erro] preenchido), mostra a mensagem e o botão
+/// "Tentar de novo" no lugar da rodinha, para a tela não ficar girando à toa.
+class Carregando extends StatelessWidget {
+  final String? erro;
+  final VoidCallback? onTentarDeNovo;
+
+  const Carregando({super.key, this.erro, this.onTentarDeNovo});
+
+  @override
+  Widget build(BuildContext context) {
+    if (erro == null) {
+      return const Padding(
+        padding: EdgeInsets.all(32),
+        child: Center(child: CircularProgressIndicator(color: Cores.verde)),
+      );
+    }
+    return EstadoVazio(
+      icone: Icons.error_outline,
+      titulo: 'Algo deu errado',
+      mensagem: erro!,
+      acao: onTentarDeNovo == null
+          ? null
+          : FilledButton.icon(
+              onPressed: onTentarDeNovo,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Tentar de novo'),
+            ),
+    );
+  }
 }
 
 /// Abre o menu lateral (Drawer) da navegação principal. Some se a tela não tiver Drawer.

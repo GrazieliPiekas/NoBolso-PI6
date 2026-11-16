@@ -2,9 +2,10 @@ import 'package:flutter/foundation.dart';
 
 import '../services/orcamento_service.dart';
 import '../utils/eventos.dart';
+import 'carregamento_seguro.dart';
 
 /// Orçamentos do mês: medidor, avisos e limites por categoria (RF03/RF04).
-class OrcamentosViewModel extends ChangeNotifier {
+class OrcamentosViewModel extends ChangeNotifier with CarregamentoSeguro {
   final _servico = OrcamentoService();
 
   ResumoOrcamentos? resumo;
@@ -17,11 +18,10 @@ class OrcamentosViewModel extends ChangeNotifier {
   }
 
   /// Recalcula o resumo do mês atual.
-  Future<void> carregar() async {
+  Future<void> carregar() => carregarComSeguranca(() async {
     resumo = await _servico.resumo(DateTime.now());
     versao++;
-    notifyListeners();
-  }
+  });
 
   @override
   void dispose() {

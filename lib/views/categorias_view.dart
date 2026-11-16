@@ -135,7 +135,10 @@ class _CategoriasViewState extends State<CategoriasView>
           ),
           Expanded(
             child: _viewModel.categorias == null
-                ? const Carregando()
+                ? Carregando(
+                    erro: _viewModel.erro,
+                    onTentarDeNovo: _viewModel.carregar,
+                  )
                 : TabBarView(
                     controller: _abas,
                     children: [for (final tipo in _tipos) _grade(tipo)],

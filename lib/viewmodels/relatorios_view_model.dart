@@ -13,9 +13,10 @@ import '../services/relatorio_pdf_service.dart';
 import '../services/relatorio_planilha_service.dart';
 import '../utils/eventos.dart';
 import '../utils/formatadores.dart';
+import 'carregamento_seguro.dart';
 
 /// Relatórios: filtros De/Até, categoria e tipo; resumo; exportação; recomendações.
-class RelatoriosViewModel extends ChangeNotifier {
+class RelatoriosViewModel extends ChangeNotifier with CarregamentoSeguro {
   final _dao = LancamentoDao();
 
   Periodo periodo = Periodo.mes(DateTime.now());
@@ -45,7 +46,9 @@ class RelatoriosViewModel extends ChangeNotifier {
       categorias.where((opcao) => tipo == null || opcao.tipo == tipo).toList();
 
   /// Busca categorias, totais e recomendações do período escolhido.
-  Future<void> carregar() async {
+  Future<void> carregar() => carregarComSeguranca(_carregar);
+
+  Future<void> _carregar() async {
     final todasCategorias = await CategoriaDao().listar();
     final totaisDoPeriodo = await _dao.totais(
       periodo: periodo,
@@ -61,7 +64,6 @@ class RelatoriosViewModel extends ChangeNotifier {
     }
     totais = totaisDoPeriodo;
     recomendacoes = recomendacoesDoPeriodo;
-    notifyListeners();
   }
 
   /// Se a data inicial passar da final, a final acompanha (e vice-versa).
@@ -105,7 +107,7 @@ class RelatoriosViewModel extends ChangeNotifier {
       );
     } finally {
       exportando = false;
-      notifyListeners();
+      avisar();
     }
   }
 

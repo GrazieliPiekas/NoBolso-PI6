@@ -135,4 +135,11 @@ class LancamentoFormViewModel extends ChangeNotifier {
     await _dao.excluir(editar!.id!);
     Eventos.notificarDados();
   }
+
+  /// "Desfazer" depois de excluir. É static porque o formulário (e este
+  /// ViewModel) já fechou quando a pessoa toca no botão do aviso.
+  static Future<void> desfazerExclusao(Lancamento lancamento) async {
+    await LancamentoDao().restaurar(lancamento);
+    Eventos.notificarDados();
+  }
 }

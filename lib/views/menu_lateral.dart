@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import '../widgets/perfil_dialog.dart';
 import 'abertura_view.dart';
+import 'backup_view.dart';
 import 'categorias_view.dart';
 import 'lancamentos_view.dart';
 import 'sobre_view.dart';
@@ -88,6 +89,11 @@ class MenuLateral extends StatelessWidget {
               Navigator.pop(context);
               PerfilDialog.abrir(context);
             },
+          ),
+          ListTile(
+            leading: const Icon(Icons.save_alt, color: Cores.verde),
+            title: const Text('Backup dos dados'),
+            onTap: () => abrir(const BackupView()),
           ),
           const Divider(),
           if (aoVerTutorial != null)

@@ -4,7 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 /// Notificações locais de orçamento (RF05). Nenhum servidor envolvido.
-/// Em plataformas sem suporte (desktop de desenvolvimento, testes) vira no-op.
+/// No Windows e nos testes não tem notificação, então os métodos não fazem nada.
 class NotificacaoService {
   NotificacaoService._();
   static final NotificacaoService instance = NotificacaoService._();

@@ -240,7 +240,14 @@ class _RelatoriosViewState extends State<RelatoriosView> {
 
   Widget _cartaoResumo() {
     final totais = _viewModel.totais;
-    if (totais == null) return const CartaoSecao(child: Carregando());
+    if (totais == null) {
+      return CartaoSecao(
+        child: Carregando(
+          erro: _viewModel.erro,
+          onTentarDeNovo: _viewModel.carregar,
+        ),
+      );
+    }
     final maior = math.max(1, math.max(totais.receitas, totais.despesas));
     Widget linha(String rotulo, int valor, Color cor) => Padding(
       padding: const EdgeInsets.only(bottom: 10),
@@ -368,7 +375,10 @@ class _RelatoriosViewState extends State<RelatoriosView> {
       titulo: 'Recomendações',
       acao: const RotuloSuave('Automáticas'),
       child: recomendacoes == null
-          ? const Carregando()
+          ? Carregando(
+              erro: _viewModel.erro,
+              onTentarDeNovo: _viewModel.carregar,
+            )
           : Column(
               children: [
                 for (final item in recomendacoes) _ItemRecomendacao(item),
